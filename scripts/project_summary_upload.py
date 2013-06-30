@@ -213,7 +213,7 @@ def save_couchdb_obj(db, obj):
         #obj["creation_time"] = time_log 	#
         #obj["modification_time"] = time_log 	#
         #db.save(obj)				#
-	return 'Not Created'		
+	return None	
     elif obj.has_key('source'):
 	if obj['source']=='lims':
 	    return None
@@ -436,69 +436,38 @@ def strip_scilife_name(names):
 				P[name_init] = prep.replace('_', '')
 	return N, P
 
-
 def  main(client, CONFIG, URL, proj_ID, all_projects, GPL ):
-	couch = couchdb.Server("http://" + URL)
-       	samp_db = couch['samples']
+        couch = couchdb.Server("http://" + URL)
+        samp_db = couch['samples']
         proj_db = couch['projects']
-	info = None
-	WS_projects = get_WS_info(client)
+        info = None
+        WS_projects = get_WS_info(client)
         if all_projects:
-		content, ws_key, ss_key = get_google_document("Genomics Project list", GPL, client) 	
-		row_ind, col_ind = get_column(content, 'Project name')
-		arrivaldate_row_ind, arrivaldate_col_ind = get_column(content, 'Arrival date')
-		for j, row in enumerate(content):
-      			try:
-	        		proj_ID = str(row[col_ind]).strip().split(' ')[0]
-				datelist = str(row[arrivaldate_col_ind]).split('/')
-				new=[]
-				for d in datelist:
-					if len(d)==1:
-						new.append('0'+str(d))
-					else:
-						new.append(d)
-				arrival_date = int(new[2]+new[0]+new[1]) 
-				if (proj_ID != '') & (j > row_ind + 2) & (arrival_date < 20130701):
-                       			obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
-        				if obj['samples'].keys() != []:
-                				info = save_couchdb_obj(proj_db, obj)
-						if info:
-							logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
-			except:
-				pass		
-	elif proj_ID is not None:
-     		content, ws_key, ss_key = get_google_document("Genomics Project list", GPL, client)
-          	row_ind, col_ind = get_column(content, 'Project name')
-           	arrivaldate_row_ind, arrivaldate_col_ind = get_column(content, 'Arrival date')
-          	for j, row in enumerate(content):
-             		try:
-                                proj_ID_google = str(row[col_ind]).strip().split(' ')[0]
-				print proj_ID_google
-				datelist = str(row[arrivaldate_col_ind]).split('/')
-				print datelist
-				new=[]
-                                for d in datelist:
-                                        if len(d)==1:
-                                                new.append('0'+str(d))
-                                        else:
-                                                new.append(d)
-                            	arrival_date = int(new[2]+new[0]+new[1])
-                            	if (proj_ID == proj_ID_google) & (j > row_ind + 2):
-					if arrival_date < 20130701:
-	       					obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
-        					if obj['samples'].keys() != []:
-                					info = save_couchdb_obj(proj_db, obj)
-					else:
-						sys.exit('project entered into GPL after first of july. Load with project_summary_uppload_LIMS.py')
+                content, ws_key, ss_key = get_google_document("Genomics Project list", GPL, client)
+                row_ind, col_ind = get_column(content, 'Project name')
+                for j, row in enumerate(content):
+                        try:
+                                proj_ID = str(row[col_ind]).strip().split(' ')[0]
+                                if (proj_ID != '') & (j > row_ind + 2):
+                                        obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
+                                        if obj['samples'].keys() != []:
+                                                info = save_couchdb_obj(proj_db, obj)
+                                                if info:
+                                                        logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
+						else:
+							logger.info('CouchDB: %s %s Not uppdated. Project might be opened after first of july' % (obj['_id'], obj['project_name'])
                         except:
-				pass
+                                pass
+        elif proj_ID is not None:
+                obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
+                if obj['samples'].keys() != []:
+                        info = save_couchdb_obj(proj_db, obj)
+        else:
+                logger.debug('Argument error')
+        if info:
+                logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
 	else:
-		logger.debug('Argument error')
-	if info:
-		logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
-	else:
-		logger.info('%s not in GPL?' % proj_ID)
-
+		logger.info('Project opened after first of jul? Load with project_summary_uppoad_LIMS.py')
 
 
 if __name__ == '__main__':
