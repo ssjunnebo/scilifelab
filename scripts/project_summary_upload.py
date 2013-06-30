@@ -210,10 +210,10 @@ def save_couchdb_obj(db, obj):
     dbobj = db.get(obj['_id'])
     time_log = datetime.utcnow().isoformat() + "Z"
     if dbobj is None:
-        obj["creation_time"] = time_log 	#
-        obj["modification_time"] = time_log 	#
-        db.save(obj)				#
-	return 'Created'		
+        #obj["creation_time"] = time_log 	#
+        #obj["modification_time"] = time_log 	#
+        #db.save(obj)				#
+	return 'Not Created'		
     elif obj.has_key('source'):
 	if obj['source']=='lims':
 	    return None
