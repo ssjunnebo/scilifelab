@@ -3,7 +3,7 @@ log module
 """
 import sys
 import logging
-
+import bcbio.pipeline.config_loader as cl
 
 def minimal_logger(namespace, debug=False):
     """Make and return a minimal console logger.
@@ -36,3 +36,31 @@ def minimal_logger(namespace, debug=False):
 
     log.addHandler(console)
     return log
+
+
+
+def file_logger(namespace, config_file, log_file):
+        CONFIG = cl.load_config(config_file)
+        log_path = CONFIG['analysis']['log'] + '/' + log_file
+
+        logger = logging.getLogger(namespace)
+        logger.setLevel(logging.DEBUG)
+
+        # file handler
+        fh = logging.FileHandler(log_path)
+        fh.setLevel(logging.INFO)
+
+        # console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        # formatter
+        formatter = logging.Formatter("%(asctime)s (%(levelname)s) : %(message)s")
+        fh.setFormatter(formatter)
+
+        # add handlers to logger
+        logger.addHandler(ch)
+        logger.addHandler(fh)
+
+        return logger
+
