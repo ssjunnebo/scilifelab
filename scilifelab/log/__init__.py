@@ -41,7 +41,7 @@ def minimal_logger(namespace, debug=False):
 
 def file_logger(namespace, config_file, log_file):
         CONFIG = cl.load_config(config_file)
-        log_path = CONFIG['analysis']['log'] + '/' + log_file
+        log_path = CONFIG['log_dir'] + '/' + log_file
 
         logger = logging.getLogger(namespace)
         logger.setLevel(logging.DEBUG)
