@@ -81,7 +81,8 @@ class ProjectMetaData:
            "customer_reference": "Customer reference",
            "application": "Application",
            "no_finished_samples": "No of samples finished (All sequencing finished)",
-           "uppnex_id": "Uppnex ID"
+           "uppnex_id": "Uppnex ID",
+	   "arrival_date" : "Arrival date"
         }
 
     def _get_project_id(self):
@@ -150,6 +151,12 @@ class ProjectMetaData:
     def _set_type(self, value):
         self._type = value
 
+    def _get_arrival_date(self):
+        return self._arrival_date
+
+    def _set_arrival_date(self, value):
+        self._arrival_date = value
+
     type = property(_get_type, _set_type)
     project_id = property(_get_project_id, _set_project_id)
     project_name = property(_get_project_name, _set_project_name)
@@ -161,3 +168,4 @@ class ProjectMetaData:
     application = property(_get_application, _set_application)
     no_finished_samples = property(_get_no_finished_samples, _set_no_finished_samples)
     uppnex_id = property(_get_uppnex_id, _set_uppnex_id)
+    arrival_date = property(_get_arrival_date, _set_arrival_date)

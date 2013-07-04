@@ -96,6 +96,8 @@ def upload_to_gdocs(fcdir, credentials_file=None, gdocs_folder=None):
         ssheet_name = "{}_sequencing_results".format(project)
         ssheet = SpreadSheet(credentials,ssheet_name)
         ssheet.move_to_folder(gdocs_folder)
+        # Truncate the summary worksheet so that it won't show the wrong information in case upload fails
+        write_flowcell_metrics([], ssheet, "Summary")
         write_flowcell_metrics(project_samples, ssheet, wsheet_name)
         
         # Create the summary over all worksheets in the project
@@ -255,11 +257,11 @@ def collect_metrics(path):
         return {}
     
     # Insert a dummy character as the parse method expects a flowcell position
-    metrics = parser.parse_demultiplex_stats_htm("X{}".format(fcid))
+    metrics = parser.parse_demultiplex_stats_htm(fcid)
     metrics['RunInfo'] = run_info
     
     # Get the undemultiplexed indexes
-    undemux = parser.parse_undemultiplexed_barcode_metrics("X{}".format(fcid))
+    undemux = parser.parse_undemultiplexed_barcode_metrics(fcid)
     metrics['Undemultiplexed'] = undemux
     
     return metrics

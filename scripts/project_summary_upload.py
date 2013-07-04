@@ -50,8 +50,8 @@ def get_proj_inf(WS_projects,project_name_swe, samp_db, proj_db, client, config)
 		obj['application'] = p.application
 		obj['customer_reference'] = p.customer_reference
 		obj['project_id']='P' + p.project_id
-		print p.type
 		obj['type']=p.type
+		obj['open_date']=p.arrival_date
 
 	### 20132
 	info = get_20132_info(client,project_name_swe)
@@ -135,12 +135,20 @@ def get_proj_inf(WS_projects,project_name_swe, samp_db, proj_db, client, config)
                         if obj['samples'].has_key(striped_scilife_name):
                                 if obj['samples'][striped_scilife_name].has_key("library_prep"):
                                         if obj['samples'][striped_scilife_name]["library_prep"].has_key(prep):
-                                                obj['samples'][striped_scilife_name]["library_prep"][prep]["average_size_bp"]=Av_sice
-                                                obj['samples'][striped_scilife_name]["library_prep"][prep]["prep_status"]=prep_status
+						if (Av_sice != '-') and (Av_sice != ''):
+                                                	obj['samples'][striped_scilife_name]["library_prep"][prep]["average_size_bp"]=Av_sice
+						if (prep_status != '-') and (prep_status != ''):
+                                                	obj['samples'][striped_scilife_name]["library_prep"][prep]["prep_status"]=prep_status
                                         else:
-                                                obj['samples'][striped_scilife_name]["library_prep"][prep]={"average_size_bp":Av_sice,"prep_status":prep_status}
+						if (Av_sice != '-') and (Av_sice != ''):
+                                                	obj['samples'][striped_scilife_name]["library_prep"][prep]={"average_size_bp":Av_sice}
+						if (prep_status != '-') and (prep_status != ''):
+							obj['samples'][striped_scilife_name]["library_prep"][prep]["prep_status"]=prep_status
                                 else:
-                                        obj['samples'][striped_scilife_name]["library_prep"]={prep:{"average_size_bp":Av_sice,"prep_status":prep_status}}
+					if (Av_sice != '-') and (Av_sice != ''):
+                                        	obj['samples'][striped_scilife_name]["library_prep"]={prep:{"average_size_bp":Av_sice}}
+					if (prep_status != '-') and (prep_status != ''):
+						obj['samples'][striped_scilife_name]["library_prep"][prep]["prep_status"]=prep_status
       	return obj
 
 
@@ -202,10 +210,13 @@ def save_couchdb_obj(db, obj):
     dbobj = db.get(obj['_id'])
     time_log = datetime.utcnow().isoformat() + "Z"
     if dbobj is None:
-        obj["creation_time"] = time_log 
-        obj["modification_time"] = time_log 
-        db.save(obj)
-	return 'Created'
+        #obj["creation_time"] = time_log 	#
+        #obj["modification_time"] = time_log 	#
+        #db.save(obj)				#
+	return None	
+    elif obj.has_key('source'):
+	if obj['source']=='lims':
+	    return None
     else:
         obj["_rev"] = dbobj.get("_rev")
 	del dbobj["modification_time"]
@@ -412,7 +423,7 @@ def strip_scilife_name(names):
         preps = 'F_BCDE'
         for name_init in names:
 		prep = ''
-		indexes = ['_index','_rpi','_agilent','_mondrian','_haloht','_halo','_sureselect','_dual','_hht','_ss','_i','_r','_a','_m','_h']
+		indexes = ['_nxdual','_index','_rpi','_agilent','_mondrian','_haloht','_halo','_sureselect','_dual','_hht','_ss','_i','_r','_a','_m','_h']
 		name = name_init.replace('-', '_').replace(' ', '')
 		for i in indexes:
 			name=name.split(i)[0]
@@ -425,35 +436,39 @@ def strip_scilife_name(names):
 				P[name_init] = prep.replace('_', '')
 	return N, P
 
-
 def  main(client, CONFIG, URL, proj_ID, all_projects, GPL ):
-	couch = couchdb.Server("http://" + URL)
-       	samp_db = couch['samples']
+        couch = couchdb.Server("http://" + URL)
+        samp_db = couch['samples']
         proj_db = couch['projects']
-	info = None
-	WS_projects = get_WS_info(client)
+        info = None
+        WS_projects = get_WS_info(client)
         if all_projects:
-		content, ws_key, ss_key = get_google_document("Genomics Project list", GPL, client) 	
-		row_ind, col_ind = get_column(content, 'Project name')
-		for j, row in enumerate(content):
-      			try:
-	        		proj_ID = str(row[col_ind]).strip().split(' ')[0]
-				if (proj_ID != '') & (j > row_ind + 2):
-                       			obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
-        				if obj['samples'].keys() != []:
-                				info = save_couchdb_obj(proj_db, obj)
-						if info:
-							logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
-			except:
-				pass		
-	elif proj_ID is not None:
-	        obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
-        	if obj['samples'].keys() != []:
-                	info = save_couchdb_obj(proj_db, obj)
+                content, ws_key, ss_key = get_google_document("Genomics Project list", GPL, client)
+                row_ind, col_ind = get_column(content, 'Project name')
+                for j, row in enumerate(content):
+                        try:
+                                proj_ID = str(row[col_ind]).strip().split(' ')[0]
+                                if (proj_ID != '') & (j > row_ind + 2):
+                                        obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
+                                        if obj['samples'].keys() != []:
+                                                info = save_couchdb_obj(proj_db, obj)
+                                                if info:
+                                                        logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
+						else:
+							logger.info('CouchDB: %s %s Not uppdated. Project might be opened after first of july' % (obj['_id'], obj['project_name'])
+                        except:
+                                pass
+        elif proj_ID is not None:
+                obj = get_proj_inf(WS_projects,proj_ID, samp_db, proj_db, client, CONFIG)
+                if obj['samples'].keys() != []:
+                        info = save_couchdb_obj(proj_db, obj)
+        else:
+                logger.debug('Argument error')
+        if info:
+                logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
 	else:
-		logger.debug('Argument error')
-	if info:
-		logger.info('CouchDB: %s %s %s' % (obj['_id'], obj['project_name'], info))
+		logger.info('Project opened after first of jul? Load with project_summary_uppoad_LIMS.py')
+
 
 if __name__ == '__main__':
     	usage = """Usage:	python project_summary_upload.py [options]

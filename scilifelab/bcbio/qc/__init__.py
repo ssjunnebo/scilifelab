@@ -508,8 +508,8 @@ class SampleRunMetricsParser(RunMetricsParser):
     def read_picard_metrics(self, barcode_name, sample_prj, lane, flowcell, barcode_id, **kw):
         self.log.debug("read_picard_metrics for sample {}, project {}, lane {} in run {}".format(barcode_name, sample_prj, lane, flowcell))
         picard_parser = ExtendedPicardMetricsParser()
-        pattern = "|".join(["{}_[0-9]+_[0-9A-Za-z]+(_nophix)?_{}-.*.(align|hs|insert|dup)_metrics".format(lane, barcode_id),
-                            "{}_[0-9]+_[0-9A-Za-z]+_{}(_nophix)?-.*.(align|hs|insert|dup)_metrics".format(lane, barcode_id)])
+        pattern = "|".join(["{}_[0-9]+_[0-9A-Za-z]+(_nophix)?(_{})?-.*.(align|hs|insert|dup)_metrics".format(lane, barcode_id),
+                            "{}_[0-9]+_[0-9A-Za-z]+(_{})?(_nophix)?-.*.(align|hs|insert|dup)_metrics".format(lane, barcode_id)])
         files = self.filter_files(pattern)
         if len(files) == 0:
             self.log.warn("no picard metrics files for sample {}; pattern {}".format(barcode_name, pattern))
@@ -525,8 +525,9 @@ class SampleRunMetricsParser(RunMetricsParser):
     def parse_fastq_screen(self, barcode_name, sample_prj, lane, flowcell, barcode_id, **kw):
         self.log.debug("parse_fastq_screen for sample {}, project {}, lane {} in run {}".format(barcode_name, sample_prj, lane, flowcell))
         parser = MetricsParser()
-        pattern = "|".join(["{}_[0-9]+_[0-9A-Za-z]+(_nophix)?_{}_[12]_screen.txt".format(lane, barcode_id),
-                            "{}_[0-9]+_[0-9A-Za-z]+_{}(_nophix)?_[12]_screen.txt".format(lane, barcode_id)])
+        pattern = "|".join(["{}_[0-9]+_[0-9A-Za-z]+(_nophix)?(_{})?_[12]_screen.txt".format(lane, barcode_id),
+                            "{}_[0-9]+_[0-9A-Za-z]+(_{})?(_nophix)?_[12]_screen.txt".format(lane, barcode_id),
+                            "{}_{}_L0*{}_.*_screen.txt".format(barcode_name, kw.get("sequence"), lane)])
         files = self.filter_files(pattern)
         self.log.debug("files {}".format(",".join(files)))
         try:
@@ -562,7 +563,7 @@ class SampleRunMetricsParser(RunMetricsParser):
         self.log.debug("read_fastqc_metrics for sample {}, project {}, lane {} in run {}".format(barcode_name, sample_prj, lane, flowcell))
         if barcode_name == "unmatched":
             return
-        pattern = "fastqc/{}_[0-9]+_[0-9A-Za-z]+(_nophix)?_{}-*".format(lane, barcode_id)
+        pattern = "fastqc/{}_[0-9]+_[0-9A-Za-z]+(_nophix)?(_{})?-*".format(lane, barcode_id)
         files = self.filter_files(pattern)
         self.log.debug("files {}".format(",".join(files)))
         try:
@@ -578,7 +579,7 @@ class SampleRunMetricsParser(RunMetricsParser):
     def parse_filter_metrics(self, **kw):
         """CASAVA: Parse filter metrics at sample level"""
         self.log.debug("parse_filter_metrics for lane {}, project {} in flowcell {}".format(lane, sample_prj, flowcell))
-        pattern = "{}_[0-9]+_[0-9A-Za-z]+_{}(_nophix)?.filter_metrics".format(lane, barcode_id)
+        pattern = "{}_[0-9]+_[0-9A-Za-z]+(_{})?(_nophix)?.filter_metrics".format(lane, barcode_id)
         files = self.filter_files(pattern)
         self.log.debug("files {}".format(",".join(files)))
         try:
@@ -772,7 +773,7 @@ class FlowcellRunMetricsParser(RunMetricsParser):
         
         lanes = {str(k):{} for k in self._lanes}
         # Use a glob to allow for multiple fastq folders
-        metrics_file_pattern = os.path.join(self.path, "Unaligned*", "Basecall_Stats_{}".format(fc_name), "Undemultiplexed_stats.metrics")
+        metrics_file_pattern = os.path.join(self.path, "Unaligned*", "Basecall_Stats_*{}".format(fc_name[1:]), "Undemultiplexed_stats.metrics")
         for metrics_file in glob.glob(metrics_file_pattern):
             self.log.debug("parsing {}".format(metrics_file))
             if not os.path.exists(metrics_file):
@@ -804,7 +805,7 @@ class FlowcellRunMetricsParser(RunMetricsParser):
         metrics = {"Barcode_lane_statistics": [],
                    "Sample_information": []}
         # Use a glob to allow for multiple fastq directories
-        htm_file_pattern = os.path.join(self.path, "Unaligned*", "Basecall_Stats_{}".format(fc_name), "Demultiplex_Stats.htm")
+        htm_file_pattern = os.path.join(self.path, "Unaligned*", "Basecall_Stats_*{}".format(fc_name[1:]), "Demultiplex_Stats.htm")
         for htm_file in glob.glob(htm_file_pattern):
             self.log.debug("parsing {}".format(htm_file))
             if not os.path.exists(htm_file):
