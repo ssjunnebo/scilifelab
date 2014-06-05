@@ -878,8 +878,13 @@ class FlowcellRunMetricsParser(RunMetricsParser):
         """Parse the undetermined indices top barcodes materics
         """
 
-        # Use a glob to allow for multiple fastq folders
-        metrics_file_pattern = os.path.join(self.path, "Unaligned*", "Basecall_Stats_*{}".format(fc_name[1:]), "Undemultiplexed_stats.metrics")
+        # Use a glob to allow for multiple fastq folders. Unaligned_XXbp folders have precedence
+        metrics_file_pattern = os.path.join(self.path, "Unaligned_*", "Basecall_Stats_*{}".format(fc_name[1:]), "Undemultiplexed_stats.metrics")
+
+        # If Unaligned_XXbp folders are missing for some reason, use the summary in Unaligned folder
+        if not len(glob.glob(metrics_file_pattern)):
+            metrics_file_pattern = os.path.join(self.path, "Unaligned", "Basecall_Stats_*{}".format(fc_name[1:]), "Undemultiplexed_stats.metrics")
+
         metrics = {'undemultiplexed_barcodes': []}
         for metrics_file in glob.glob(metrics_file_pattern):
             self.log.debug("parsing {}".format(metrics_file))
