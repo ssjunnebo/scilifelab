@@ -55,7 +55,7 @@ class ProjectDB():
         self.samp_db = samp_db
         self.lims_project = Project(self.lims,id = project_id)
         self.preps = ProcessInfo(self.lims , self.lims.get_processes(projectname = self.lims_project.name, type = AGRLIBVAL.values()))
-        runs = self.lims.get_processes(projectname = self.lims_project.name, type = SEQUENCING.values())
+        runs = self.lims.get_processes(projectname = self.lims_project.name, type = DEMULTIPLEX.values())
         self.runs = ProcessInfo(self.lims, runs)
         project_summary = self.lims.get_processes(projectname = self.lims_project.name, type = SUMMARY.values())
         self.project = {'source' : 'lims',
@@ -154,9 +154,8 @@ class ProcessInfo():
     'Aggregate QC (Library Validation) 4.0' and forms  a dict with info about 
     all processes of the type specified in runs which the project has gon through.
 
-    info = {24-8460:{'finish_date':'2013-04-20', 
-              'start_date',
-              'process_id':'24-8460',
+    info = {24-8460:{ 
+              'start_date'
               'samples':{'P424_111':{in_art_id1 : [in_art1, out_art1],
                          in_art_id2: [in_art2, out_art2]},
                      'P424_115': ...},
@@ -171,16 +170,9 @@ class ProcessInfo():
             process_info[process.id] = {'type' : process.type.name ,
                                 'start_date': process.date_run,
                                 'samples' : {}}
-            process_udfs = dict(process.udf.items())
-            if "Run ID" in process_udfs.keys():
-                process_info[process.id]['process_id'] = process_udfs["Run ID"]
-            if 'Finish Date' in process_udfs:
-                process_info[process.id]['finish_date'] = process_udfs['Finish Date'].isoformat()
-            else:
-                process_info[process.id]['finish_date'] = None
             in_arts=[]
             for in_art_id, out_art_id in process.input_output_maps:
-                in_art = in_art_id['uri']#these are actually artifacts
+                in_art = in_art_id['uri']       #these are actually artifacts
                 out_art = out_art_id['uri']
                 samples = in_art.samples
                 if in_art.id not in in_arts:
@@ -262,9 +254,9 @@ class SampleDB():
             return None
         return index
 
-    def get_sample_run_metrics(self, SeqRun_info, preps):
-        """Input: SeqRun_info - instance of the ProcessInfo class with 
-        SEQUENCING processes as argument
+    def get_sample_run_metrics(self, demux_info, preps):
+        """Input: demux_info - instance of the ProcessInfo class with 
+        DEMULTIPLEX processes as argument
         For each SEQUENCING process run on the sample, this function steps 
         bacward in the artifact history of the input artifact of the SEQUENCING 
         process to find the folowing information:
@@ -287,21 +279,22 @@ class SampleDB():
         "Finnished". These keys are used to connect the seqeuncing steps to the 
         correct preps."""
         sample_runs = {}
-        for id, run in SeqRun_info.items():
-            if run['samples'].has_key(self.name) and run.has_key('process_id'):
-                date = run['process_id'].split('_')[0]
-                fcid = run['process_id'].split('_')[3]
-                run_type = run['type']
+        print '*************'
+        for id, run in demux_info.items():
+            print 'sssssssssssssss'
+            print run
+            if run['samples'].has_key(self.name):
+                print 'dddddddddddddd'
                 for id , arts in run['samples'][self.name].items():
-                    lane_art = arts[0]
-                    outart = arts[1]
-                    if run_type == "MiSeq Run (MiSeq) 4.0":
-                        lane = lane_art.location[1].split(':')[1]
-                    else:
-                        lane = lane_art.location[1].split(':')[0]
-                    history = gent.SampleHistory(sample_name=self.name, output_artifact=outart.id,
-                                            input_artifact=lane_art.id, lims=self.lims, pro_per_art=self.processes_per_artifact )   
-                    steps = ProcessSpec(history.history, history.history_list, self.application)
+                    print 'aaaa'
+                    history = gent.SampleHistory(sample_name = self.name, 
+                                    output_artifact = arts[1].id,        
+                                    input_artifact = arts[0].id,        
+                                    lims = self.lims,        
+                                    pro_per_art = self.processes_per_artifact)
+                    steps = ProcessSpec(history.history, history.history_list, 
+                                                             self.application)
+                    print steps.lastseq
                     if self.application in ['Finished library', 'Amplicon']:
                         key = 'Finished'
                     elif steps.preprepstart:
@@ -312,38 +305,32 @@ class SampleDB():
                         key = None 
                     if key:
                         if preps[key].has_key('reagent_label'):
+                            ## ---- make a separate function get smprunid -->
                             barcode = self.get_barcode(preps[key]['reagent_label'])
+                            run_type = steps.lastseq['type']
+                            outart = Artifact(lims, id = steps.latestdem['outart'])
+                            inart = Artifact(lims, id = steps.lastseq['inart'])
+                            lims_run = Process(lims, id = steps.lastseq['id'])
+                            run_id = lims_run.udf['Run ID']
+                            date = run_id.split('_')[0]
+                            fcid = run_id.split('_')[3]
+                            if run_type == "MiSeq Run (MiSeq) 4.0":
+                                lane = inart.location[1].split(':')[1]
+                            else:
+                                lane = inart.location[1].split(':')[0]
                             try:
                                 samp_run_met_id = '_'.join([lane, date, fcid, barcode])
                             except TypeError: #happens if the History object is missing fields, barcode might be None
                                 logging.debug(self.name+" ",preps[key],"-", preps[key]['reagent_label'])
                                 raise TypeError
+                            ## <--------
                             dict = {'sample_run_metrics_id':find_sample_run_id_from_view(self.samp_db, samp_run_met_id),
                                 'dillution_and_pooling_start_date' : steps.dilstart['date'] if steps.dilstart else None,
                                 'sequencing_start_date' : steps.seqstart['date'] if steps.seqstart else None,
                                 'sequencing_run_QC_finished' : run['start_date'],
-                                'sequencing_finish_date' : run['finish_date']}
-                            #Adding sequencing qc flag
-                            try:
-                                #need to work with the current state of the artifact, so ...
-                                #I use the key of the current lane run to get te correct artifact. id comes from the for above.
-                                #if i use lane_art, I get the same art, but in a old state, so the QC flag is NOT set.
-                                inart=Artifact(lims, id=id)
-                                dict['seq_qc_flag']=inart.qc_flag
-                                demproc=lims.get_processes(type=DEMULTIPLEX.values(), inputartifactlimsid=id)
-                                try:
-                                    latestdem=sorted(demproc, key=lambda a:a.date_run)[-1]
-                                    for out in latestdem.all_outputs():
-                                        if self.name in [s.name for s in out.samples]:
-                                            dict['dem_qc_flag']=out.qc_flag
-                                except IndexError:
-                                    #We did not find any demultiplex process, this is fine
-                                    pass
-                            except IndexError:
-                                #that should not happen. log and raise
-                                logging.error("cant find the correct starting artifact for sample {} in {}".format(self.name, run))    
-                                raise IndexError
-
+                                'sequencing_finish_date' : lims_run.udf['Finish Date'].isoformat(),
+                                'dem_qc_flag' : outart.qc_flag,
+                                'seq_qc_flag' : inart.qc_flag}
                             dict = delete_Nones(dict)
                             if not sample_runs.has_key(key):
                                 sample_runs[key] = {}
@@ -472,7 +459,6 @@ class InitialQC():
         self._set_initialqc_processes(hist_sort, hist_list)
 
     def _set_initialqc_processes(self, hist_sort, hist_list):
-
         for inart in hist_list:
             art_steps = hist_sort[inart]
             # INITALQCEND - get last agr initialqc val step after prepreplibval
@@ -539,6 +525,10 @@ class ProcessSpec():
         self.dilstarts = []
         self.poolingsteps = []
         self.firstpoolstep = None
+        self.demproc = []
+        self.latestdem = None
+        self.seq = []
+        self.lastseq = None
         self._set_prep_processes(hist_sort, hist_list)
 
     def _set_prep_processes(self, hist_sort, hist_list):
@@ -592,6 +582,15 @@ class ProcessSpec():
             # 11) POOLING STEPS
             self.poolingsteps += filter(lambda pro: (pro['type'] in
                                         POOLING), art_steps.values()) 
+            # 12) DEMULTIPLEXING
+            self.demproc += filter(lambda pro: (pro['type'] in
+                                               DEMULTIPLEX), art_steps.values())
+            # 13) SEQUENCING
+            self.seq += filter(lambda pro: (pro['type'] in
+                                                SEQUENCING), art_steps.values())
+    
+        self.lastseq = get_last_first(self.seq)
+        self.latestdem = get_last_first(self.demproc)
         self.workset = get_last_first(self.worksets) 
         self.libvalstart = get_last_first(self.libvals, last = False)
         self.libvalend = get_last_first(self.libvalends)
