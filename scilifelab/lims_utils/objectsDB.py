@@ -279,14 +279,9 @@ class SampleDB():
         "Finnished". These keys are used to connect the seqeuncing steps to the 
         correct preps."""
         sample_runs = {}
-        print '*************'
         for id, run in demux_info.items():
-            print 'sssssssssssssss'
-            print run
             if run['samples'].has_key(self.name):
-                print 'dddddddddddddd'
                 for id , arts in run['samples'][self.name].items():
-                    print 'aaaa'
                     history = gent.SampleHistory(sample_name = self.name, 
                                     output_artifact = arts[1].id,        
                                     input_artifact = arts[0].id,        
@@ -294,7 +289,6 @@ class SampleDB():
                                     pro_per_art = self.processes_per_artifact)
                     steps = ProcessSpec(history.history, history.history_list, 
                                                              self.application)
-                    print steps.lastseq
                     if self.application in ['Finished library', 'Amplicon']:
                         key = 'Finished'
                     elif steps.preprepstart:
@@ -304,20 +298,21 @@ class SampleDB():
                     else:
                         key = None 
                     if key:
-                        if preps[key].has_key('reagent_label'):
+                        lims_run = Process(lims, id = steps.lastseq['id'])
+                        if preps[key].has_key('reagent_label') and lims_run.udf.items().has_key('Finish Date'):
                             ## ---- make a separate function get smprunid -->
                             barcode = self.get_barcode(preps[key]['reagent_label'])
                             run_type = steps.lastseq['type']
-                            outart = Artifact(lims, id = steps.latestdem['outart'])
-                            inart = Artifact(lims, id = steps.lastseq['inart'])
+                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             run_id = lims_run.udf['Run ID']
                             date = run_id.split('_')[0]
                             fcid = run_id.split('_')[3]
                             if run_type == "MiSeq Run (MiSeq) 4.0":
-                                lane = inart.location[1].split(':')[1]
+                                lane = seq_art.location[1].split(':')[1]
                             else:
-                                lane = inart.location[1].split(':')[0]
+                                lane = seq_art.location[1].split(':')[0]
                             try:
                                 samp_run_met_id = '_'.join([lane, date, fcid, barcode])
                             except TypeError: #happens if the History object is missing fields, barcode might be None
@@ -329,8 +324,8 @@ class SampleDB():
                                 'sequencing_start_date' : steps.seqstart['date'] if steps.seqstart else None,
                                 'sequencing_run_QC_finished' : run['start_date'],
                                 'sequencing_finish_date' : lims_run.udf['Finish Date'].isoformat(),
-                                'dem_qc_flag' : outart.qc_flag,
-                                'seq_qc_flag' : inart.qc_flag}
+                                'dem_qc_flag' : dem_art.qc_flag,
+                                'seq_qc_flag' : seq_art.qc_flag}
                             dict = delete_Nones(dict)
                             if not sample_runs.has_key(key):
                                 sample_runs[key] = {}
@@ -529,6 +524,8 @@ class ProcessSpec():
         self.latestdem = None
         self.seq = []
         self.lastseq = None
+        self.caliper_procs = []
+        self.latestCaliper = None
         self._set_prep_processes(hist_sort, hist_list)
 
     def _set_prep_processes(self, hist_sort, hist_list):
@@ -540,7 +537,6 @@ class ProcessSpec():
             #1) PREPREPSTART
             self.preprepstarts += filter(lambda pro: (pro['type'] in 
                             PREPREPSTART and pro['outart']), art_steps.values()) #and pro['outart'] ##26 may
-
             if self.preprepstarts and not self.prepends: 
                 # 2)PREPREPLIBVALSTART PREPREPLIBVALEND
                 self.prepreplibvals += filter(lambda pro: (pro['type'] in 
@@ -559,18 +555,15 @@ class ProcessSpec():
                                                 LIBVAL, art_steps.values())
                 self.libvalends += filter(lambda pro: pro['type'] in
                                                 AGRLIBVAL, art_steps.values())
-
             # 4) PREPSTART
             self.prepstarts += filter(lambda pro: (pro['type'] in 
                             PREPSTART) and pro['outart'], art_steps.values()) 
             # 5) PREPEND            - get latest prep end
             self.prepends += filter(lambda pro: (pro['type'] in 
                             PREPEND) and pro['outart'] , art_steps.values())
-
             # 8) WORKSET            - get latest workset
             self.worksets += filter(lambda pro: (pro['type'] in 
                             WORKSET) and pro['outart'], art_steps.values()) 
-
             # 9) SEQSTART dubbelkolla
             if not self.seqstarts:
                 self.seqstarts = filter(lambda pro: (pro['type'] in SEQSTART) 
@@ -588,7 +581,10 @@ class ProcessSpec():
             # 13) SEQUENCING
             self.seq += filter(lambda pro: (pro['type'] in
                                                 SEQUENCING), art_steps.values())
-    
+            # 14) CALIPER
+            self.caliper_procs += filter(lambda pro: (pro['type'] in
+                                                   CALIPER), art_steps.values())
+        self.latestCaliper = get_last_first(self.caliper_procs)
         self.lastseq = get_last_first(self.seq)
         self.latestdem = get_last_first(self.demproc)
         self.workset = get_last_first(self.worksets) 
