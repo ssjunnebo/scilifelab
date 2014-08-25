@@ -299,7 +299,8 @@ class SampleDB():
                         key = None 
                     if key:
                         lims_run = Process(lims, id = steps.lastseq['id'])
-                        if preps[key].has_key('reagent_label') and lims_run.udf.items().has_key('Finish Date'):
+                        run_dict = dict(lims_run.udf.items())
+                        if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
                             ## ---- make a separate function get smprunid -->
                             barcode = self.get_barcode(preps[key]['reagent_label'])
                             run_type = steps.lastseq['type']
@@ -319,17 +320,17 @@ class SampleDB():
                                 logging.debug(self.name+" ",preps[key],"-", preps[key]['reagent_label'])
                                 raise TypeError
                             ## <--------
-                            dict = {'sample_run_metrics_id':find_sample_run_id_from_view(self.samp_db, samp_run_met_id),
+                            d = {'sample_run_metrics_id':find_sample_run_id_from_view(self.samp_db, samp_run_met_id),
                                 'dillution_and_pooling_start_date' : steps.dilstart['date'] if steps.dilstart else None,
                                 'sequencing_start_date' : steps.seqstart['date'] if steps.seqstart else None,
                                 'sequencing_run_QC_finished' : run['start_date'],
                                 'sequencing_finish_date' : lims_run.udf['Finish Date'].isoformat(),
                                 'dem_qc_flag' : dem_art.qc_flag,
                                 'seq_qc_flag' : seq_art.qc_flag}
-                            dict = delete_Nones(dict)
+                            d = delete_Nones(d)
                             if not sample_runs.has_key(key):
                                 sample_runs[key] = {}
-                            sample_runs[key][samp_run_met_id] = dict
+                            sample_runs[key][samp_run_met_id] = d
         return sample_runs
 
     def _get_prep_leter(self, prep_info):
