@@ -5,7 +5,6 @@ statusdb with lims as the main source of information.
 
 Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 """
-import load_status_from_google_docs  ### Temorary solution untill 20158 implemented in LIMS!!!
 import codecs
 from scilifelab.google import _to_unicode, _from_unicode
 from pprint import pprint
@@ -46,87 +45,98 @@ def get_last_first(process_list, last=True):
 ### Classes  ###
 
 class ProjectDB():
-    """Instances of this class holds a dictionary formatted for building up the project database on statusdb. 
-    Source of information come from different lims artifacts and processes. A detailed documentation of the 
-    source of all values is found in: 
-    https://docs.google.com/a/scilifelab.se/document/d/1OHRsSI9btaBU4Hb1TiqJ5wwdRqUQ4BAyjJR-Nn5qGHg/edit#"""
+    """Instances of this class holds a dictionary formatted for building up the 
+    project database on statusdb. Source of information come from different lims
+    artifacts and processes. A detailed documentation of the"""
+
     def __init__(self, lims_instance, project_id, samp_db):
         self.lims = lims_instance 
         self.samp_db = samp_db
         self.lims_project = Project(self.lims,id = project_id)
-        self.preps = ProcessInfo(self.lims , self.lims.get_processes(projectname = self.lims_project.name, type = AGRLIBVAL.values()))
-        runs = self.lims.get_processes(projectname = self.lims_project.name, type = DEMULTIPLEX.values())
-        self.runs = ProcessInfo(self.lims, runs)
-        project_summary = self.lims.get_processes(projectname = self.lims_project.name, type = SUMMARY.values())
+        self.udfs = self.lims_project.udf.items()
+        self.preps = ProcessInfo(self.lims , self.lims.get_processes(
+               projectname = self.lims_project.name, type = AGRLIBVAL.values()))
+        self.demux = self.lims.get_processes(projectname = self.lims_project.name,
+                                                    type = DEMULTIPLEX.values())
+        self.demux_procs = ProcessInfo(self.lims, self.demux)
+        self._get_project_level_info()
+        self._make_DB_samples()
+        self._get_sequencing_finished()
+
+    def _get_project_level_info(self):
         self.project = {'source' : 'lims',
-            'application' : None,
-            'samples':{},
-            'open_date' : self.lims_project.open_date,
-            'close_date' : self.lims_project.close_date,
-            'entity_type' : 'project_summary',
-            'contact' : self.lims_project.researcher.email,
-            'project_name' : self.lims_project.name,
-            'project_id' : self.lims_project.id}
-        self.project = get_udfs('details', self.project, self.lims_project.udf.items(), PROJ_UDF_EXCEPTIONS)
-        if dict(self.lims_project.researcher.lab.udf.items()).has_key('Affiliation'):
-            self.project['affiliation'] = dict(self.lims_project.researcher.lab.udf.items())['Affiliation']
+                        'application' : None,
+                        'samples':{},
+                        'open_date' : self.lims_project.open_date,
+                        'close_date' : self.lims_project.close_date,
+                        'entity_type' : 'project_summary',
+                        'contact' : self.lims_project.researcher.email,
+                        'project_name' : self.lims_project.name,
+                        'project_id' : self.lims_project.id}
+        self.project = get_udfs('details', self.project, self.udfs,
+                                                            PROJ_UDF_EXCEPTIONS)
+        self._get_affiliation()
+        self._get_project_summary_info()
+
+    def _get_affiliation(self):
+        researcher_udfs = dict(self.lims_project.researcher.lab.udf.items())
+        if researcher_udfs.has_key('Affiliation'):
+            self.project['affiliation'] = researcher_udfs['Affiliation']
+
+
+    def _get_project_summary_info(self):
+        project_summary = self.lims.get_processes(projectname =
+                                self.lims_project.name, type = SUMMARY.values())
         if len(project_summary) == 1:
-            self.project = get_udfs('project_summary', self.project, project_summary[0].udf.items())
+            self.project = get_udfs('project_summary', self.project,
+                                                 project_summary[0].udf.items())
         elif len(project_summary) > 1:
             print 'Warning. project summary process run more than once'
 
-        #################Temporary solution untill 20158 implemented in lims >>>>>>>>>>>>>>>>>>>>>>>
-        ## can be reooved when all project opened before 2014-01-27 have been closed for more than 60 days
-        ## then we also need to block old projects so that they are not overwriten in case of someone manualy 
-        ## updating it with the -p flagg
-        opened = self.lims_project.open_date
-        googledocs_status = {}
-        if opened:
-            try:
-                googledocs_status = load_status_from_google_docs.get(self.lims_project.name)
-            except:
-                print 'issues finding status from 20158'
-                pass
-        ## Finish Date = last seq date if proj closed. Will be removed and feched from lims.
-        seq_finished = None
-        if self.lims_project.close_date and len(runs) > 0:
-            d = '2000-10-10'
-            for run in runs:
-                try:
-                    new_date = dict(run.udf.items())['Finish Date'].isoformat()
-                    if comp_dates(d,new_date):
-                        d = new_date
-                    seq_finished = d
-                except:
-                    pass
-        self.project['sequencing_finished'] = seq_finished
-        #Temporary solution untill 20158 implemented in lims <<<<<<<<<<<<<<<<<<<<<<<
+    def _get_sequencing_finished(self):
+        """Finish Date = last seq date if proj closed. Will be removed and 
+        feched from lims."""
+        seq_fin = []
+        if self.lims_project.close_date and 'samples' in self.project.keys():
+            for samp in self.project['samples'].values():
+                if 'library_prep' in samp.keys(): 
+                    for prep in samp['library_prep'].values():
+                        if 'sample_run_metrics' in prep.keys():
+                            for run in prep['sample_run_metrics'].values():
+                                if 'sequencing_finish_date' in run.keys():
+                                    seq_fin.append(run['sequencing_finish_date'])
+            if seq_fin:
+                self.project['sequencing_finished'] = max(seq_fin)
+            else:
+                self.project['sequencing_finished'] = None
 
+    def _make_DB_samples(self):
         ## Getting sample info
         samples = self.lims.get_samples(projectlimsid = self.lims_project.id)
         self.project['no_of_samples'] = len(samples)
         if len(samples) > 0:
-            processes_per_artifact = self.build_processes_per_artifact(self.lims, self.lims_project.name)
+            procss_per_art = self.build_processes_per_artifact(self.lims,
+                                                         self.lims_project.name)
             self.project['first_initial_qc'] = '3000-10-10'
-            for samp in samples: 
+            for samp in samples:
                 sampDB = SampleDB(self.lims,
-                                samp.id,
-                                self.project['project_name'],
-                                self.samp_db,
-                                self.project['application'],
-                                self.preps.info,
-                                self.runs.info,
-                                googledocs_status,#googledocs_status Temporary solution untill 20158 implemented in lims!!
-                                processes_per_artifact = processes_per_artifact) 
+                                  samp.id,
+                                  self.project['project_name'],
+                                  self.samp_db,
+                                  self.project['application'],
+                                  self.preps.info,
+                                  self.demux_procs.info,
+                                  processes_per_artifact = procss_per_art)
                 self.project['samples'][sampDB.name] = sampDB.obj
-##### initial qc fixa
                 try:
                     initial_qc_start_date = self.project['samples'][sampDB.name]['initial_qc']['start_date']
-                    if comp_dates(initial_qc_start_date,self.project['first_initial_qc']):
+                    if comp_dates(initial_qc_start_date,
+                                  self.project['first_initial_qc']):
                         self.project['first_initial_qc'] = initial_qc_start_date
                 except:
                     pass
         self.project = delete_Nones(self.project)
+
 
     def build_processes_per_artifact(self,lims, pname):
         """Constructs a dictionary linking each artifact id with its processes.
@@ -146,9 +156,6 @@ class ProjectDB():
 
         return processes_per_artifact
 
-
-
-
 class ProcessInfo():
     """This class takes a list of process type names. Eg 
     'Aggregate QC (Library Validation) 4.0' and forms  a dict with info about 
@@ -163,8 +170,9 @@ class ProcessInfo():
         '24-8480':...}"""
     def __init__(self, lims_instance, processes):
         self.lims = lims_instance
-        self.info = self.get_process_info(processes)
-    def get_process_info(self, processes):
+        self.info = self._get_process_info(processes)
+
+    def _get_process_info(self, processes):
         process_info = {}
         for process in processes:
             process_info[process.id] = {'type' : process.type.name ,
@@ -187,22 +195,16 @@ class ProcessInfo():
 class SampleDB():
     """Instances of this class holds a dictionary formatted for building up the 
     samples in the project database on status db. Source of information come 
-    from different lims artifacts and processes. A detailed documentation of the
-     source of all values is found in
-    https://docs.google.com/a/scilifelab.se/document/d/1OHRsSI9btaBU4Hb1TiqJ5wwdRqUQ4BAyjJR-Nn5qGHg/edit#"""
-    def __init__(self,lims_instance , sample_id, project_name, samp_db, 
+    from different lims artifacts and processes."""
+    def __init__(self, lims_instance , sample_id, project_name, samp_db,
                         application = None, prep_info = [], run_info = [],
-                        googledocs_status = {},
                         processes_per_artifact = None): 
-      # googledocs_status temporary solution untill 20158 implemented in lims!!
         self.lims = lims_instance
         self.samp_db = samp_db
         self.AgrLibQCs = prep_info
         self.lims_sample = Sample(self.lims, id = sample_id)
         self.name = self.lims_sample.name
         self.application = application
-        #deprecated
-        #self.outin = make_sample_artifact_maps(self.name)
         self.obj = get_udfs('details', {}, 
                                 self.lims_sample.udf.items(), 
                                 SAMP_UDF_EXCEPTIONS)
@@ -211,7 +213,7 @@ class SampleDB():
         self.processes_per_artifact = processes_per_artifact
         preps = self._get_preps_and_libval()
         if preps:
-            runs = self.get_sample_run_metrics(run_info, preps)
+            runs = self._get_sample_run_metrics(run_info, preps)
             for prep_id in runs.keys():
                 if preps.has_key(prep_id):
                     preps[prep_id]['sample_run_metrics'] = runs[prep_id]
@@ -226,9 +228,6 @@ class SampleDB():
                                                                         init_qc)
         self.obj['first_prep_start_date'] = self._get_firts_day(self.name, 
                                     PREPSTART.values() + PREPREPSTART.values())
-        if googledocs_status and self.name in googledocs_status.keys():
-            self.obj['status'] = googledocs_status[self.name][0]
-            self.obj['m_reads_sequenced'] = googledocs_status[self.name][1]
         self.obj = delete_Nones(self.obj)
 
     def _get_firts_day(self, sample_name ,process_list, last_day = False):
@@ -254,7 +253,7 @@ class SampleDB():
             return None
         return index
 
-    def get_sample_run_metrics(self, demux_info, preps):
+    def _get_sample_run_metrics(self, demux_info, preps):
         """Input: demux_info - instance of the ProcessInfo class with 
         DEMULTIPLEX processes as argument
         For each SEQUENCING process run on the sample, this function steps 
@@ -301,37 +300,49 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            ## ---- make a separate function get smprunid -->
-                            barcode = self.get_barcode(preps[key]['reagent_label'])
-                            run_type = steps.lastseq['type']
                             dem_art = Artifact(lims, id = steps.latestdem['outart'])
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
-                            run_id = lims_run.udf['Run ID']
-                            date = run_id.split('_')[0]
-                            fcid = run_id.split('_')[3]
-                            if run_type == "MiSeq Run (MiSeq) 4.0":
-                                lane = seq_art.location[1].split(':')[1]
-                            else:
-                                lane = seq_art.location[1].split(':')[0]
-                            try:
-                                samp_run_met_id = '_'.join([lane, date, fcid, barcode])
-                            except TypeError: #happens if the History object is missing fields, barcode might be None
-                                logging.debug(self.name+" ",preps[key],"-", preps[key]['reagent_label'])
-                                raise TypeError
-                            ## <--------
-                            d = {'sample_run_metrics_id':find_sample_run_id_from_view(self.samp_db, samp_run_met_id),
-                                'dillution_and_pooling_start_date' : steps.dilstart['date'] if steps.dilstart else None,
-                                'sequencing_start_date' : steps.seqstart['date'] if steps.seqstart else None,
-                                'sequencing_run_QC_finished' : run['start_date'],
-                                'sequencing_finish_date' : lims_run.udf['Finish Date'].isoformat(),
-                                'dem_qc_flag' : dem_art.qc_flag,
-                                'seq_qc_flag' : seq_art.qc_flag}
-                            d = delete_Nones(d)
-                            if not sample_runs.has_key(key):
-                                sample_runs[key] = {}
-                            sample_runs[key][samp_run_met_id] = d
+                            samp_run_met_id = self._make_sample_run_id(seq_art, 
+                                                           lims_run, preps[key],
+                                                          steps.lastseq['type'])
+                            if samp_run_met_id:
+                                srmi = find_sample_run_id_from_view(self.samp_db,
+                                                                 samp_run_met_id)
+                                dpsd = steps.dilstart['date'] if steps.dilstart else None
+                                ssd = steps.seqstart['date'] if steps.seqstart else None
+                                sfd = lims_run.udf['Finish Date'].isoformat()
+                                d = {'sample_run_metrics_id' : srmi,
+                                    'dillution_and_pooling_start_date' : dpsd,
+                                    'sequencing_start_date' : ssd,
+                                    'sequencing_run_QC_finished' : run['start_date'],
+                                    'sequencing_finish_date' : sfd,
+                                    'dem_qc_flag' : dem_art.qc_flag,
+                                    'seq_qc_flag' : seq_art.qc_flag}
+                                d = delete_Nones(d)
+                                if not sample_runs.has_key(key):
+                                    sample_runs[key] = {}
+                                sample_runs[key][samp_run_met_id] = d
         return sample_runs
+
+    def _make_sample_run_id(self, seq_art, lims_run, prep, run_type):
+        barcode = self.get_barcode(prep['reagent_label'])
+        if run_type == "MiSeq Run (MiSeq) 4.0":
+            lane = seq_art.location[1].split(':')[1]
+        else:
+            lane = seq_art.location[1].split(':')[0]
+        if dict(lims_run.udf.items()).has_key('Run ID'):
+            run_id = lims_run.udf['Run ID']
+            try:
+                date = run_id.split('_')[0]
+                fcid = run_id.split('_')[3]
+                samp_run_met_id = '_'.join([lane, date, fcid, barcode])
+            except TypeError: 
+                samp_run_met_id = None
+                #happens if the History object is missing fields, barcode might be None
+                logging.debug(self.name+" ",prep,"-", prep['reagent_label'])
+                raise TypeError
+        return samp_run_met_id
 
     def _get_prep_leter(self, prep_info):
         """Get preps and prep names; A,B,C... based on prep dates for 
@@ -361,21 +372,29 @@ class SampleDB():
             AgrLibQC_info = self.AgrLibQCs[AgrLibQC_id]
             if AgrLibQC_info['samples'].has_key(self.name):
                 inart, outart = AgrLibQC_info['samples'][self.name].items()[0][1]
-                
-                history = gent.SampleHistory(sample_name=self.name, output_artifact=outart.id,
-                                        input_artifact=inart.id, lims=self.lims, pro_per_art=self.processes_per_artifact )   
-                steps = ProcessSpec(history.history, history.history_list, self.application)
+                history = gent.SampleHistory(sample_name = self.name, 
+                                    output_artifact = outart.id, 
+                                    input_artifact = inart.id, 
+                                    lims = self.lims, 
+                                    pro_per_art = self.processes_per_artifact )
+                steps = ProcessSpec(history.history, history.history_list, 
+                                    self.application)
                 prep = Prep(self.name)
                 prep.set_prep_info(steps, self.application)
                 if not preps.has_key(prep.id2AB) and prep.id2AB:
                     preps[prep.id2AB] = prep.prep_info
                 if prep.pre_prep_library_validations and prep.id2AB:
-                    preps[prep.id2AB]['pre_prep_library_validation'].update(prep.pre_prep_library_validations)
+                    preps[prep.id2AB]['pre_prep_library_validation'].update(
+                                              prep.pre_prep_library_validations)
                 if prep.library_validations and prep.id2AB:
-                    preps[prep.id2AB]['library_validation'].update(prep.library_validations)
+                    preps[prep.id2AB]['library_validation'].update(
+                                                       prep.library_validations)
                     last_libval_key = max(prep.library_validations.keys())
                     last_libval = prep.library_validations[last_libval_key]
-                    if not very_last_libval_key.has_key(prep.id2AB) or (last_libval_key > very_last_libval_key[prep.id2AB]):
+                    in_last = very_last_libval_key.has_key(prep.id2AB)
+                    is_last = prep.id2AB in very_last_libval_key and (
+                             last_libval_key > very_last_libval_key[prep.id2AB])
+                    if is_last or not in_last:
                         very_last_libval_key[prep.id2AB] = last_libval_key
                         if last_libval.has_key('prep_status'):
                             preps[prep.id2AB]['prep_status'] = last_libval['prep_status']
@@ -421,7 +440,11 @@ class SampleDB():
             if AgrLibQC_info['samples'].has_key(self.name):
                 topLevel_AgrLibQC[AgrLibQC_id]=[]
                 inart, outart = AgrLibQC_info['samples'][self.name].items()[0][1]
-                history = gent.SampleHistory(sample_name=self.name, output_artifact=outart.id, input_artifact=inart.id,lims=self.lims, pro_per_art=self.processes_per_artifact)
+                history = gent.SampleHistory(sample_name = self.name, 
+                                        output_artifact = outart.id, 
+                                        input_artifact = inart.id,
+                                        lims = self.lims, 
+                                        pro_per_art = self.processes_per_artifact)
                 for inart in history.history_list:
                     proc_info =history.history[inart]
                     proc_info = filter(lambda p : 
@@ -463,14 +486,16 @@ class InitialQC():
             # INITALQCSTART - get all lib val step after prepreplibval
             self.initialqcs += filter(lambda pro: pro['type'] in self.init_qc,
                                                             art_steps.values())
-            self.caliper_procs+=filter(lambda pro: pro['type'] in CALIPER.keys(), art_steps.values())
+            self.caliper_procs+=filter(lambda pro: pro['type'] in CALIPER.keys()
+                                                           , art_steps.values())
         self.initialqcend = get_last_first(self.initialqcends, last = True)
         self.initialqstart =  get_last_first(self.initialqcs, last = False)
         try:
-            self.last_caliper = Process(lims,id=get_last_first(self.caliper_procs, last = True)['id'])
+            self.last_caliper = Process(lims,id=get_last_first(
+                                         self.caliper_procs, last = True)['id'])
             outarts=self.last_caliper.all_outputs()
             for out in outarts:
-                if (self.sample_name in [p.name for p in out.samples] and out.type=="ResultFile"):
+                if (self.sample_name in [p.name for p in out.samples] and out.type == "ResultFile"):
                     files=out.files
                     for f in files:
                         if ".png" in f.content_location:
@@ -537,7 +562,7 @@ class ProcessSpec():
             art_steps = hist_sort[inart]
             #1) PREPREPSTART
             self.preprepstarts += filter(lambda pro: (pro['type'] in 
-                            PREPREPSTART and pro['outart']), art_steps.values()) #and pro['outart'] ##26 may
+                            PREPREPSTART and pro['outart']), art_steps.values())
             if self.preprepstarts and not self.prepends: 
                 # 2)PREPREPLIBVALSTART PREPREPLIBVALEND
                 self.prepreplibvals += filter(lambda pro: (pro['type'] in 
@@ -547,7 +572,7 @@ class ProcessSpec():
             elif self.application in ['Finished library', 'Amplicon']: 
                 # 6) LIBVALSTART LIBVALEND
                 self.libvals += filter(lambda pro: pro['type'] in
-                                                LIBVALFINISHEDLIB, art_steps.values())
+                                          LIBVALFINISHEDLIB, art_steps.values())
                 self.libvalends += filter(lambda pro: pro['type'] in
                                                 AGRLIBVAL, art_steps.values())
             elif self.prepends: 
@@ -677,7 +702,8 @@ class Prep():
                 average_size_bp = library_validation.pop("size_(bp)")
                 library_validation["average_size_bp"] = average_size_bp
             #adding caliper
-            caliper_procs=lims.get_processes(type=CALIPER.values(),inputartifactlimsid=agrlibQCstep['inart'] )
+            caliper_procs=lims.get_processes(type=CALIPER.values(),
+                                    inputartifactlimsid = agrlibQCstep['inart'])
             arts=[]
             try:
                 latestCaliper=sorted(caliper_procs, key=lambda proc:proc.date_run)[-1]
@@ -686,7 +712,7 @@ class Prep():
                 #Caliper has not been run in libval
                 pass
             for art in arts:
-                if (self.sample_name in [a.name for a in art.samples] and art.type=="ResultFile"):
+                if (self.sample_name in [a.name for a in art.samples] and art.type == "ResultFile"):
                     files=art.files
                     for f in files:
                         if ".png" in f.content_location:
