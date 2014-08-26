@@ -326,6 +326,7 @@ class SampleDB():
         return sample_runs
 
     def _make_sample_run_id(self, seq_art, lims_run, prep, run_type):
+        samp_run_met_id = None
         barcode = self.get_barcode(prep['reagent_label'])
         if run_type == "MiSeq Run (MiSeq) 4.0":
             lane = seq_art.location[1].split(':')[1]
@@ -338,7 +339,6 @@ class SampleDB():
                 fcid = run_id.split('_')[3]
                 samp_run_met_id = '_'.join([lane, date, fcid, barcode])
             except TypeError: 
-                samp_run_met_id = None
                 #happens if the History object is missing fields, barcode might be None
                 logging.debug(self.name+" ",prep,"-", prep['reagent_label'])
                 raise TypeError
