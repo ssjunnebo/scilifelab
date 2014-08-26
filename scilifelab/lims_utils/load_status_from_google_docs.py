@@ -102,5 +102,10 @@ def get(project_ID, proj):
                         proj['samples'][sample]['details'] = {
                                             'status_(manual)' : info[sample][1],
                                             'total_reads_(m)' : info[sample][0]}
+                    else:
+                        if not proj['samples'][sample]['details'].has_key('status_(manual)'):
+                            proj['samples'][sample]['details']['status_(manual)'] = info[sample][1]
+                        if not proj['samples'][sample]['details'].has_key('total_reads_(m)'):
+                            proj['samples'][sample]['details']['total_reads_(m)'] = info[sample][0]
     return proj
 
