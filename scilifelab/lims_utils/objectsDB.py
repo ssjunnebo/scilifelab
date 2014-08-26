@@ -61,6 +61,7 @@ class ProjectDB():
         self.demux_procs = ProcessInfo(self.lims, self.demux)
         self._get_project_level_info()
         self._make_DB_samples()
+        self._get_sequencing_finished()
 
     def _get_project_level_info(self):
         self.project = {'source' : 'lims',
@@ -76,7 +77,6 @@ class ProjectDB():
                                                             PROJ_UDF_EXCEPTIONS)
         self._get_affiliation()
         self._get_project_summary_info()
-        #self._get_sequencing_finished()
 
     def _get_affiliation(self):
         researcher_udfs = dict(self.lims_project.researcher.lab.udf.items())
@@ -96,18 +96,19 @@ class ProjectDB():
     def _get_sequencing_finished(self):
         """Finish Date = last seq date if proj closed. Will be removed and 
         feched from lims."""
-        seq_finished = None
-        if self.lims_project.close_date and len(self.seq_processes) > 0:
-            d = '2000-10-10'
-            for run in self.seq_processes:
-                try:
-                    new_date = dict(run.udf.items())['Finish Date'].isoformat()
-                    if comp_dates(d,new_date):
-                        d = new_date
-                    seq_finished = d
-                except:
-                    pass
-        self.project['sequencing_finished'] = seq_finished
+        seq_fin = []
+        if self.lims_project.close_date and 'samples' in self.project.keys():
+            for samp in self.project['samples'].values():
+                if 'library_prep' in samp.keys(): 
+                    for prep in samp['library_prep'].values():
+                        if 'sample_run_metrics' in prep.keys():
+                            for run in prep['sample_run_metrics'].values():
+                                if 'sequencing_finish_date' in run.keys():
+                                    seq_fin.append(run['sequencing_finish_date'])
+            if seq_fin:
+                self.project['sequencing_finished'] = max(seq_fin)
+            else:
+                self.project['sequencing_finished'] = None
 
     def _make_DB_samples(self):
         ## Getting sample info
@@ -299,38 +300,49 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            ## ---- make a separate function get smprunid -->
-                            barcode = self.get_barcode(preps[key]['reagent_label'])
-                            run_type = steps.lastseq['type']
                             dem_art = Artifact(lims, id = steps.latestdem['outart'])
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
-                            if run_type == "MiSeq Run (MiSeq) 4.0":
-                                lane = seq_art.location[1].split(':')[1]
-                            else:
-                                lane = seq_art.location[1].split(':')[0]
-                            try:
-                                run_id = lims_run.udf['Run ID']
-                                date = run_id.split('_')[0]
-                                fcid = run_id.split('_')[3]
-                                samp_run_met_id = '_'.join([lane, date, fcid, barcode])
-                            except TypeError: #happens if the History object is missing fields, barcode might be None
-                                logging.debug(self.name+" ",preps[key],"-", preps[key]['reagent_label'])
-                                #raise TypeError
-                                pass
-                            ## <--------
-                            d = {'sample_run_metrics_id' : find_sample_run_id_from_view(self.samp_db, samp_run_met_id),
-                                'dillution_and_pooling_start_date' : steps.dilstart['date'] if steps.dilstart else None,
-                                'sequencing_start_date' : steps.seqstart['date'] if steps.seqstart else None,
-                                'sequencing_run_QC_finished' : run['start_date'],
-                                'sequencing_finish_date' : lims_run.udf['Finish Date'].isoformat(),
-                                'dem_qc_flag' : dem_art.qc_flag,
-                                'seq_qc_flag' : seq_art.qc_flag}
-                            d = delete_Nones(d)
-                            if not sample_runs.has_key(key):
-                                sample_runs[key] = {}
-                            sample_runs[key][samp_run_met_id] = d
+                            samp_run_met_id = self._make_sample_run_id(seq_art, 
+                                                           lims_run, preps[key],
+                                                          steps.lastseq['type'])
+                            if samp_run_met_id:
+                                srmi = find_sample_run_id_from_view(self.samp_db,
+                                                                 samp_run_met_id)
+                                dpsd = steps.dilstart['date'] if steps.dilstart else None
+                                ssd = steps.seqstart['date'] if steps.seqstart else None
+                                sfd = lims_run.udf['Finish Date'].isoformat()
+                                d = {'sample_run_metrics_id' : srmi,
+                                    'dillution_and_pooling_start_date' : dpsd,
+                                    'sequencing_start_date' : ssd,
+                                    'sequencing_run_QC_finished' : run['start_date'],
+                                    'sequencing_finish_date' : sfd,
+                                    'dem_qc_flag' : dem_art.qc_flag,
+                                    'seq_qc_flag' : seq_art.qc_flag}
+                                d = delete_Nones(d)
+                                if not sample_runs.has_key(key):
+                                    sample_runs[key] = {}
+                                sample_runs[key][samp_run_met_id] = d
         return sample_runs
+
+    def _make_sample_run_id(self, seq_art, lims_run, prep, run_type):
+        barcode = self.get_barcode(prep['reagent_label'])
+        if run_type == "MiSeq Run (MiSeq) 4.0":
+            lane = seq_art.location[1].split(':')[1]
+        else:
+            lane = seq_art.location[1].split(':')[0]
+        if dict(lims_run.udf.items()).has_key('Run ID'):
+            run_id = lims_run.udf['Run ID']
+            try:
+                date = run_id.split('_')[0]
+                fcid = run_id.split('_')[3]
+                samp_run_met_id = '_'.join([lane, date, fcid, barcode])
+            except TypeError: 
+                samp_run_met_id = None
+                #happens if the History object is missing fields, barcode might be None
+                logging.debug(self.name+" ",prep,"-", prep['reagent_label'])
+                raise TypeError
+        return samp_run_met_id
 
     def _get_prep_leter(self, prep_info):
         """Get preps and prep names; A,B,C... based on prep dates for 

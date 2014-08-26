@@ -9,12 +9,13 @@ import sys
 import os
 import codecs
 from optparse import OptionParser
+import load_status_from_google_docs 
 from scilifelab.db.statusDB_utils import *
 from helpers import *
 from pprint import pprint
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
-import objectsDB as DB_v0
+import objectsDB as DB
 from datetime import date
 import time
 import scilifelab.log
@@ -35,6 +36,7 @@ class PSUL():
         self.man_name = man_name
         self.days = days
         self.output_f = output_f
+        self.ordered_opened = None
 
     def print_couchdb_obj_to_file(self, obj):
         if self.output_f is not None:
@@ -47,14 +49,13 @@ class PSUL():
         """Is project registered as opened or ordered?"""
 
         if self.open_date:
-            return self.open_date
+            self.ordered_opened = self.open_date
         elif 'Order received' in dict(self.udfs.items()).keys():
-            return self.udfs['Order received'].isoformat()
+            self.ordered_opened = self.udfs['Order received'].isoformat()
         else:
             LOG.info("Project is not updated because 'Order received' date and "
                      "'open date' is missing for project {name}".format(
                      name = self.name))
-            return None
 
     def get_days_closed(self):
         """Project registered as closed?"""
@@ -65,11 +66,10 @@ class PSUL():
         else:
             return 0
 
-    def determine_update(self,ordered_opened):
+    def determine_update(self):
         """Determine wether to and how to update project"""
         days_closed = self.get_days_closed()
-        opended_after_130630 = comp_dates('2013-06-30', ordered_opened)
-        opended_after_140630 = comp_dates('2014-06-30', ordered_opened)
+        opended_after_130630 = comp_dates('2013-06-30', self.ordered_opened)
         closed_for_a_while = (days_closed > self.days)
         log_info = ''
         if (not opended_after_130630) or closed_for_a_while:
@@ -79,7 +79,7 @@ class PSUL():
                 closed for {days} days. Do you still want to load the data from 
                 lims into statusdb? 
                 Press enter for No, any other key for Yes! """.format(
-                name = self.name, ord_op = ordered_opened, days = days_closed))
+                name = self.name, ord_op = self.ordered_opened, days = days_closed))
             else:               ## Do not update
                 start_update = False
                 log_info = ('Project is not updated because: ')
@@ -88,39 +88,39 @@ class PSUL():
                                  days = days_closed))
                 if not opended_after_130630:
                     log_info += ('It was opened or ordered before 2013-06-30 '
-                                 '({ord_op})'.format(ord_op = ordered_opened))
+                                 '({ord_op})'.format(ord_op = self.ordered_opened))
         else:
             start_update = True
 
         if start_update:
-            database = DB_v0 
-            return log_info, database
-        else:
-            return log_info, None
+            log_info = self.update_project(DB)
+        return log_info
 
     def update_project(self, database):
         """Fetch project info and update project in the database."""
-        try:
+        opended_after_140630 = comp_dates('2014-06-30', self.ordered_opened)
+        #try:
+        if 1==1:
             obj = database.ProjectDB(lims, self.id, self.samp_db)
             key = find_proj_from_view(self.proj_db, self.name)
             obj.project['_id'] = find_or_make_key(key)
+            if not opended_after_140630:
+                obj.project = load_status_from_google_docs.get(self.name, obj.project)
             if self.upload_data:
                 info = save_couchdb_obj(self.proj_db, obj.project)
             else:
                 info = self.print_couchdb_obj_to_file(obj.project)
             return "project {name} is handled and {info}: _id = {id}".format(
                                name=self.name, info=info, id=obj.project['_id'])
-        except:
-            return ('Issues geting info for {name}. The "Application" udf might'
-                                         ' be missing'.format(name = self.name))
+       # except:
+       #     return ('Issues geting info for {name}. The "Application" udf might'
+       #                                  ' be missing'.format(name = self.name))
 
     def project_update_and_logging(self, proj_num = '', num_projs = ''):
         start_time = time.time()
-        ordered_opened = self.get_ordered_opened()
-        if ordered_opened:
-            log_info, database = self.determine_update(ordered_opened)
-            if database:
-                log_info = self.update_project(database)
+        self.get_ordered_opened()
+        if self.ordered_opened:
+            log_info = self.determine_update()
         else:
             log_info = ('No open date or order date found for project {name}. '
                         'Project not updated.'.format(name = self.name))
