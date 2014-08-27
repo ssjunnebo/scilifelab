@@ -9,6 +9,7 @@ from scilifelab.pm.core.controller import AbstractExtendedBaseController
 from scilifelab.bcbio.flowcell import *
 from scilifelab.lib.archive import *
 from scilifelab.db.statusdb import FlowcellRunMetricsConnection
+from scilifelab.utils.misc import get_path_swestore_staging
 
 ## Main archive controller
 class ArchiveController(AbstractExtendedBaseController):
@@ -109,7 +110,9 @@ class ArchiveController(AbstractExtendedBaseController):
             if not self._check_pargs(["flowcell"]):
                 return
 
-            self.pargs.tarball = package_run(self,self.config.get('archive','swestore_staging'), **vars(self.pargs))
+            swestore_paths = set(self.config.get('archive','swestore_staging').split(','))
+            swestore_dir = get_path_swestore_staging(self.pargs.flowcell, swestore_paths)
+            self.pargs.tarball = package_run(self, swestore_dir, **vars(self.pargs))
             if not self.pargs.tarball:
                 self.log.error("No tarball was created, exiting")
                 return
@@ -119,7 +122,7 @@ class ArchiveController(AbstractExtendedBaseController):
             if self.pargs.clean_from_staging:
                 #Check that the run has been archived on the NAS before removing it, otherwise it will keep synching
                 if self.pargs.flowcell in f_conn.get_storage_status('NAS_nosync').keys():
-                    rm_run(self,self.config.get('archive','swestore_staging'), flowcell=self.pargs.flowcell)
+                    rm_run(self, swestore_dir, flowcell=self.pargs.flowcell)
                 else:
                     self.log.warn("Run storage status is not NAS_nosync, not removing run from swestore_stage!")
 
