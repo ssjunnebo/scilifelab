@@ -292,8 +292,11 @@ class SampleDB():
         "Finnished". These keys are used to connect the seqeuncing steps to the 
         correct preps."""
         sample_runs = {}
-        for id, run in demux_info.items():
-            if run['samples'].has_key(self.name):
+        for id, run in SeqRun_info.items():
+            if run['samples'].has_key(self.name) and run.has_key('process_id'):
+                date = run['process_id'].split('_')[0]
+                fcid = run['process_id'].split('_')[3]
+                run_type = run['type']
                 for id , arts in run['samples'][self.name].items():
                     history = gent.SampleHistory(sample_name = self.name, 
                                     output_artifact = arts[1].id,        
