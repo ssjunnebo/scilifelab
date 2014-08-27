@@ -22,10 +22,27 @@ import logging
 
 ###  Functions ###
 
-def udf_dict(element, dict = {}):
+def udf_dict(element, exeptions = [], exclude = True):
+    """Takes a lims element and tertuns a dictionary of its udfs, where the udf 
+    names are trensformed to statusdb keys (underscore and lowercase).
+    
+    exeptions and exclude = False - will return a dict with only the exeptions
+    exeptions and exclude = True - will return a dict without the exeptions  
+
+    Arguments:
+        element     lims element (Sample, Artifact, Process, Project...)
+        exeptions   list of exception udf keys (underscore and lowercase)
+        exlude      (True/False)"""
+
+    dict = {}
     for key, val in element.udf.items():
         key = key.replace(' ', '_').lower().replace('.','')
-        dict[key] = val
+        try: val = val.isoformat()
+        except: pass
+        if key in exeptions and not exclude:
+            dict[key] = val
+        elif key not in exeptions and exclude:
+            dict[key] = val
     return dict
 
 def get_last_first(process_list, last=True):
@@ -52,11 +69,10 @@ class ProjectDB():
     def __init__(self, lims_instance, project_id, samp_db):
         self.lims = lims_instance 
         self.samp_db = samp_db
-        self.lims_project = Project(self.lims,id = project_id)
-        self.udfs = self.lims_project.udf.items()
+        self.project = Project(self.lims,id = project_id)
         self.preps = ProcessInfo(self.lims , self.lims.get_processes(
-               projectname = self.lims_project.name, type = AGRLIBVAL.values()))
-        self.demux = self.lims.get_processes(projectname = self.lims_project.name,
+               projectname = self.project.name, type = AGRLIBVAL.values()))
+        self.demux = self.lims.get_processes(projectname = self.project.name,
                                                     type = DEMULTIPLEX.values())
         self.demux_procs = ProcessInfo(self.lims, self.demux)
         self._get_project_level_info()
@@ -64,32 +80,31 @@ class ProjectDB():
         self._get_sequencing_finished()
 
     def _get_project_level_info(self):
-        self.project = {'source' : 'lims',
+        self.obj = {'source' : 'lims',
                         'application' : None,
                         'samples':{},
-                        'open_date' : self.lims_project.open_date,
-                        'close_date' : self.lims_project.close_date,
+                        'open_date' : self.project.open_date,
+                        'close_date' : self.project.close_date,
                         'entity_type' : 'project_summary',
-                        'contact' : self.lims_project.researcher.email,
-                        'project_name' : self.lims_project.name,
-                        'project_id' : self.lims_project.id}
-        self.project = get_udfs('details', self.project, self.udfs,
-                                                            PROJ_UDF_EXCEPTIONS)
+                        'contact' : self.project.researcher.email,
+                        'project_name' : self.project.name,
+                        'project_id' : self.project.id}
+        self.obj.update(udf_dict(self.project, PROJ_UDF_EXCEPTIONS, False))
+        self.obj['details'] = udf_dict(self.project, PROJ_UDF_EXCEPTIONS)
         self._get_affiliation()
         self._get_project_summary_info()
 
     def _get_affiliation(self):
-        researcher_udfs = dict(self.lims_project.researcher.lab.udf.items())
+        researcher_udfs = dict(self.project.researcher.lab.udf.items())
         if researcher_udfs.has_key('Affiliation'):
-            self.project['affiliation'] = researcher_udfs['Affiliation']
+            self.obj['affiliation'] = researcher_udfs['Affiliation']
 
 
     def _get_project_summary_info(self):
         project_summary = self.lims.get_processes(projectname =
-                                self.lims_project.name, type = SUMMARY.values())
+                                self.project.name, type = SUMMARY.values())
         if len(project_summary) == 1:
-            self.project = get_udfs('project_summary', self.project,
-                                                 project_summary[0].udf.items())
+            self.obj['project_summary'] = udf_dict(project_summary[0])
         elif len(project_summary) > 1:
             print 'Warning. project summary process run more than once'
 
@@ -97,8 +112,8 @@ class ProjectDB():
         """Finish Date = last seq date if proj closed. Will be removed and 
         feched from lims."""
         seq_fin = []
-        if self.lims_project.close_date and 'samples' in self.project.keys():
-            for samp in self.project['samples'].values():
+        if self.project.close_date and 'samples' in self.obj.keys():
+            for samp in self.obj['samples'].values():
                 if 'library_prep' in samp.keys(): 
                     for prep in samp['library_prep'].values():
                         if 'sample_run_metrics' in prep.keys():
@@ -106,36 +121,36 @@ class ProjectDB():
                                 if 'sequencing_finish_date' in run.keys():
                                     seq_fin.append(run['sequencing_finish_date'])
             if seq_fin:
-                self.project['sequencing_finished'] = max(seq_fin)
+                self.obj['sequencing_finished'] = max(seq_fin)
             else:
-                self.project['sequencing_finished'] = None
+                self.obj['sequencing_finished'] = None
 
     def _make_DB_samples(self):
         ## Getting sample info
-        samples = self.lims.get_samples(projectlimsid = self.lims_project.id)
-        self.project['no_of_samples'] = len(samples)
+        samples = self.lims.get_samples(projectlimsid = self.project.id)
+        self.obj['no_of_samples'] = len(samples)
         if len(samples) > 0:
             procss_per_art = self.build_processes_per_artifact(self.lims,
-                                                         self.lims_project.name)
-            self.project['first_initial_qc'] = '3000-10-10'
+                                                         self.project.name)
+            self.obj['first_initial_qc'] = '3000-10-10'
             for samp in samples:
                 sampDB = SampleDB(self.lims,
                                   samp.id,
-                                  self.project['project_name'],
+                                  self.obj['project_name'],
                                   self.samp_db,
-                                  self.project['application'],
+                                  self.obj['application'],
                                   self.preps.info,
                                   self.demux_procs.info,
                                   processes_per_artifact = procss_per_art)
-                self.project['samples'][sampDB.name] = sampDB.obj
+                self.obj['samples'][sampDB.name] = sampDB.obj
                 try:
-                    initial_qc_start_date = self.project['samples'][sampDB.name]['initial_qc']['start_date']
+                    initial_qc_start_date = self.obj['samples'][sampDB.name]['initial_qc']['start_date']
                     if comp_dates(initial_qc_start_date,
-                                  self.project['first_initial_qc']):
-                        self.project['first_initial_qc'] = initial_qc_start_date
+                                  self.obj['first_initial_qc']):
+                        self.obj['first_initial_qc'] = initial_qc_start_date
                 except:
                     pass
-        self.project = delete_Nones(self.project)
+        self.obj = delete_Nones(self.obj)
 
 
     def build_processes_per_artifact(self,lims, pname):
@@ -205,9 +220,8 @@ class SampleDB():
         self.lims_sample = Sample(self.lims, id = sample_id)
         self.name = self.lims_sample.name
         self.application = application
-        self.obj = get_udfs('details', {}, 
-                                self.lims_sample.udf.items(), 
-                                SAMP_UDF_EXCEPTIONS)
+        self.obj = udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS, False)
+        self.obj['details'] = udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS)
         self.obj['scilife_name'] = self.name
         self.obj['well_location'] = self.lims_sample.artifact.location[1]
         self.processes_per_artifact = processes_per_artifact
@@ -428,7 +442,8 @@ class SampleDB():
             latestInitQc = outart.parent_process
             inart = latestInitQc.input_per_sample(self.name)[0].id
             history = gent.SampleHistory(sample_name=self.name, output_artifact=outart.id,
-                                        input_artifact=inart, lims=self.lims, pro_per_art=self.processes_per_artifact )   
+                                        input_artifact=inart, lims=self.lims, 
+                                        pro_per_art=self.processes_per_artifact )
             if history.history_list:
                 iqc = InitialQC(self.name,history.history, history.history_list)
                 initialqc = delete_Nones(iqc.set_initialqc_info())
@@ -481,7 +496,7 @@ class InitialQC():
         for inart in hist_list:
             art_steps = hist_sort[inart]
             # INITALQCEND - get last agr initialqc val step after prepreplibval
-            self.initialqcends += filter(lambda pro: pro['type'] in self.agr_qc, 
+            self.initialqcends += filter(lambda pro: pro['type'] in self.agr_qc,
                                                             art_steps.values())
             # INITALQCSTART - get all lib val step after prepreplibval
             self.initialqcs += filter(lambda pro: pro['type'] in self.init_qc,
@@ -510,7 +525,7 @@ class InitialQC():
         if self.initialqcend:
             inart = Artifact(lims, id = self.initialqcend['inart'])
             process = Process(lims,id = self.initialqcend['id'])
-            initialqc_info = udf_dict(inart, initialqc_info)
+            initialqc_info.update(udf_dict(inart))
             initials = process.technician.initials
             initialqc_info['initials'] = initials
             initialqc_info['finish_date'] = self.initialqcend['date']
@@ -666,13 +681,13 @@ class Prep():
                 self.prep_info['pre_prep_start_date'] = steps.preprepstart['date']
                 self.id2AB = steps.preprepstart['id']
                 if steps.preprepstart['outart']:
-                    self.prep_info = udf_dict(Artifact(lims, 
-                            id = steps.preprepstart['outart']), self.prep_info)
+                    art = Artifact(lims, id = steps.preprepstart['outart'])
+                    self.prep_info.update(udf_dict(art))
             elif steps.prepstart:
                 self.id2AB = steps.prepstart['id']
                 if steps.prepstart['outart']:
-                    self.prep_info = udf_dict(Artifact(lims, 
-                                id = steps.prepstart['outart']), self.prep_info)
+                    art = Artifact(lims, id = steps.prepstart['outart'])
+                    self.prep_info.update(udf_dict(art))
         if steps.libvalend:
             self.library_validations = self._get_lib_val_info(steps.libvalends,
                                                             steps.libvalstart)
@@ -694,7 +709,7 @@ class Prep():
             library_validation['well_location'] = inart.location[1]
             library_validation['prep_status'] = inart.qc_flag
             library_validation['reagent_labels'] = inart.reagent_labels
-            library_validation = udf_dict(inart, library_validation)
+            library_validation.update(udf_dict(inart))
             initials = Process(lims, id = agrlibQCstep['id']).technician.initials
             if initials:
                 library_validation['initials'] = initials

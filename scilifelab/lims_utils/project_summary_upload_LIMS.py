@@ -101,17 +101,17 @@ class PSUL():
         opended_after_140630 = comp_dates('2014-06-30', self.ordered_opened)
         #try:
         if 1==1:
-            obj = database.ProjectDB(lims, self.id, self.samp_db)
+            project = database.ProjectDB(lims, self.id, self.samp_db)
             key = find_proj_from_view(self.proj_db, self.name)
-            obj.project['_id'] = find_or_make_key(key)
+            project.obj['_id'] = find_or_make_key(key)
             if not opended_after_140630:
-                obj.project = load_status_from_google_docs.get(self.name, obj.project)
+                project.obj = load_status_from_google_docs.get(self.name, project.obj)
             if self.upload_data:
-                info = save_couchdb_obj(self.proj_db, obj.project)
+                info = save_couchdb_obj(self.proj_db, project.obj)
             else:
-                info = self.print_couchdb_obj_to_file(obj.project)
+                info = self.print_couchdb_obj_to_file(project.obj)
             return "project {name} is handled and {info}: _id = {id}".format(
-                               name=self.name, info=info, id=obj.project['_id'])
+                               name=self.name, info=info, id=project.obj['_id'])
        # except:
        #     return ('Issues geting info for {name}. The "Application" udf might'
        #                                  ' be missing'.format(name = self.name))
