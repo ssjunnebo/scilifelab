@@ -59,6 +59,23 @@ def get_last_first(process_list, last=True):
     else:
         return None
 
+def get_caliper_img(sample_name, caliper_id):
+    caliper_image = None
+    try:
+        last_caliper = Process(lims,id = caliper_id)
+        outarts = last_caliper.all_outputs()
+        for out in outarts:
+            s_names = [p.name for p in out.samples]
+            if (sample_name in s_names and out.type == "ResultFile"):
+                files = out.files
+                for f in files:
+                    if ".png" in f.content_location:
+                        caliper_image = f.content_location
+    except TypeError:
+        #Should happen when no caliper processes are found
+        pass
+    return caliper_image
+
 ### Classes  ###
 
 class ProjectDB():
@@ -212,35 +229,41 @@ class SampleDB():
     samples in the project database on status db. Source of information come 
     from different lims artifacts and processes."""
     def __init__(self, lims_instance , sample_id, project_name, samp_db,
-                        application = None, prep_info = [], run_info = [],
+                        application = None, AgrLibQCs = [], run_info = [],
                         processes_per_artifact = None): 
         self.lims = lims_instance
         self.samp_db = samp_db
-        self.AgrLibQCs = prep_info
+        self.AgrLibQCs = AgrLibQCs
         self.lims_sample = Sample(self.lims, id = sample_id)
         self.name = self.lims_sample.name
         self.application = application
-        self.obj = udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS, False)
-        self.obj['details'] = udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS)
+        self.run_info = run_info
+        self.processes_per_artifact = processes_per_artifact
+        self.obj = {}
+        self._get_sample_info()
+
+    def _get_sample_info(self):
         self.obj['scilife_name'] = self.name
         self.obj['well_location'] = self.lims_sample.artifact.location[1]
-        self.processes_per_artifact = processes_per_artifact
+        self.obj['details'] = udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS)
+        self.obj.update(udf_dict(self.lims_sample, SAMP_UDF_EXCEPTIONS, False))
         preps = self._get_preps_and_libval()
         if preps:
-            runs = self._get_sample_run_metrics(run_info, preps)
+            runs = self._get_sample_run_metrics(self.run_info, preps)
             for prep_id in runs.keys():
                 if preps.has_key(prep_id):
                     preps[prep_id]['sample_run_metrics'] = runs[prep_id]
             self.obj['library_prep'] = self._get_prep_leter(preps)
-        initialqc = self._get_initialqc()
-        self.obj['initial_qc'] = initialqc if initialqc else None
+        initqc = InitialQC(self.lims, self.name, self.processes_per_artifact, 
+                                                            self.application)
+        self.obj['initial_qc'] = initqc.set_initialqc_info()
         if self.application in ['Finished library', 'Amplicon']:
-            init_qc = INITALQCFINISHEDLIB.values()
+            chategory = INITALQCFINISHEDLIB.values()
         else:
-            init_qc = INITALQC.values() 
+            chategory = INITALQC.values()
         self.obj['first_initial_qc_start_date'] = self._get_firts_day(self.name,
-                                                                        init_qc)
-        self.obj['first_prep_start_date'] = self._get_firts_day(self.name, 
+                                                                     chategory)
+        self.obj['first_prep_start_date'] = self._get_firts_day(self.name,
                                     PREPSTART.values() + PREPREPSTART.values())
         self.obj = delete_Nones(self.obj)
 
@@ -256,7 +279,7 @@ class SampleDB():
         except IndexError:
             return None
 
-    def get_barcode(self, reagent_label):
+    def _get_barcode(self, reagent_label):
         """Extracts barcode from list of artifact.reagent_labels"""
         if reagent_label:
             try:
@@ -341,7 +364,7 @@ class SampleDB():
 
     def _make_sample_run_id(self, seq_art, lims_run, prep, run_type):
         samp_run_met_id = None
-        barcode = self.get_barcode(prep['reagent_label'])
+        barcode = self._get_barcode(prep['reagent_label'])
         if run_type == "MiSeq Run (MiSeq) 4.0":
             lane = seq_art.location[1].split(':')[1]
         else:
@@ -391,7 +414,7 @@ class SampleDB():
                                         output_artifact = outart.id, 
                                         input_artifact = inart.id, 
                                         lims = self.lims, 
-                                        pro_per_art = self.processes_per_artifact )
+                                        pro_per_art = self.processes_per_artifact)
                     steps = ProcessSpec(history.history, history.history_list, 
                                         self.application)
                     prep = Prep(self.name)
@@ -400,15 +423,15 @@ class SampleDB():
                         preps[prep.id2AB] = prep.prep_info
                     if prep.pre_prep_library_validations and prep.id2AB:
                         preps[prep.id2AB]['pre_prep_library_validation'].update(
-                                                  prep.pre_prep_library_validations)
+                                              prep.pre_prep_library_validations)
                     if prep.library_validations and prep.id2AB:
                         preps[prep.id2AB]['library_validation'].update(
-                                                           prep.library_validations)
+                                                       prep.library_validations)
                         last_libval_key = max(prep.library_validations.keys())
                         last_libval = prep.library_validations[last_libval_key]
                         in_last = very_last_libval_key.has_key(prep.id2AB)
                         is_last = prep.id2AB in very_last_libval_key and (
-                                 last_libval_key > very_last_libval_key[prep.id2AB])
+                                  last_libval_key > very_last_libval_key[prep.id2AB])
                         if is_last or not in_last:
                             very_last_libval_key[prep.id2AB] = last_libval_key
                             if last_libval.has_key('prep_status'):
@@ -431,24 +454,6 @@ class SampleDB():
                 return last_libval['reagent_labels'][0]
             return None
         return None
-
-    def _get_initialqc(self):
-        agr_qc = AGRINITQC
-        outarts = self.lims.get_artifacts(sample_name = self.name, 
-                                                process_type = agr_qc.values())
-        parent_proc = map(lambda a: a.parent_process ,outarts)
-        initialqc = {}
-        if outarts:
-            outart = Artifact(lims, id = max(map(lambda a: a.id, outarts)))
-            latestInitQc = outart.parent_process
-            inart = latestInitQc.input_per_sample(self.name)[0].id
-            history = gent.SampleHistory(sample_name=self.name, output_artifact=outart.id,
-                                        input_artifact=inart, lims=self.lims, 
-                                        pro_per_art=self.processes_per_artifact )
-            if history.history_list:
-                iqc = InitialQC(self.name,history.history, history.history_list)
-                initialqc = delete_Nones(iqc.set_initialqc_info())
-        return delete_Nones(initialqc)       
 
     def _get_top_level_agrlibval_steps(self):
         topLevel_AgrLibQC={}
@@ -480,66 +485,54 @@ class SampleDB():
 
 class InitialQC():
     """"""
-    def __init__(self, sample_name, hist_sort, hist_list, finnished_lib = False):
-        self.sample_name=sample_name
-        self.init_qc = INITALQCFINISHEDLIB if finnished_lib else INITALQC
-        self.agr_qc = AGRLIBVAL if finnished_lib else AGRINITQC
-        self.initialqcend = None
-        self.initialqcends = []
-        self.initialqcs = []
-        self.caliper_procs= []
-        self.last_caliper=None
-        self.caliper_image=None
-        self.initialqstart = None
-        self._set_initialqc_processes(hist_sort, hist_list)
+    def __init__(self, lims_inst ,sample, procs_per_art, application):
+        self.lims = lims_inst
+        self.processes_per_artifact = procs_per_art
+        self.sample_name = sample
+        self.initialqc_info = {}
+        self.steps = None
+        self.application = application
 
-    def _set_initialqc_processes(self, hist_sort, hist_list):
-        for inart in hist_list:
-            art_steps = hist_sort[inart]
-            # INITALQCEND - get last agr initialqc val step after prepreplibval
-            self.initialqcends += filter(lambda pro: pro['type'] in self.agr_qc,
-                                                            art_steps.values())
-            # INITALQCSTART - get all lib val step after prepreplibval
-            self.initialqcs += filter(lambda pro: pro['type'] in self.init_qc,
-                                                            art_steps.values())
-            self.caliper_procs+=filter(lambda pro: pro['type'] in CALIPER.keys()
-                                                           , art_steps.values())
-        self.initialqcend = get_last_first(self.initialqcends, last = True)
-        self.initialqstart =  get_last_first(self.initialqcs, last = False)
-        try:
-            self.last_caliper = Process(lims,id=get_last_first(
-                                         self.caliper_procs, last = True)['id'])
-            outarts=self.last_caliper.all_outputs()
-            for out in outarts:
-                if (self.sample_name in [p.name for p in out.samples] and out.type == "ResultFile"):
-                    files=out.files
-                    for f in files:
-                        if ".png" in f.content_location:
-                            self.caliper_image=f.content_location
-        except TypeError:
-            #Should happen when no caliper processes are found
-            pass
+    def _get_initialqc_processes(self):
+        outarts = self.lims.get_artifacts(sample_name = self.sample_name,
+                                          process_type = AGRINITQC.values())
+        if outarts:
+            outart = Artifact(lims, id = max(map(lambda a: a.id, outarts)))
+            latestInitQc = outart.parent_process
+            inart = latestInitQc.input_per_sample(self.sample_name)[0].id
+            history = gent.SampleHistory(sample_name = self.sample_name, 
+                                      output_artifact = outart.id,
+                                      input_artifact = inart, lims = self.lims,
+                                      pro_per_art = self.processes_per_artifact)
+            if history.history_list:
+                self.steps = ProcessSpec(history.history, history.history_list,
+                                                               self.application)
 
     def set_initialqc_info(self):
-        initialqc_info = {}
-        initialqc_info['start_date'] = self.initialqstart['date'] if self.initialqstart else None
-        if self.initialqcend:
-            inart = Artifact(lims, id = self.initialqcend['inart'])
-            process = Process(lims,id = self.initialqcend['id'])
-            initialqc_info.update(udf_dict(inart))
-            initials = process.technician.initials
-            initialqc_info['initials'] = initials
-            initialqc_info['finish_date'] = self.initialqcend['date']
-            initialqc_info['initial_qc_status'] = inart.qc_flag
-        #adding initqc caliper image link
-        if self.caliper_image:
-            initialqc_info['caliper_image'] = self.caliper_image
-        return initialqc_info
+        self._get_initialqc_processes()
+        if self.steps:
+            if self.steps.initialqstart:
+                self.initialqc_info['start_date'] = self.steps.initialqstart['date']
+            if self.steps.initialqcend:
+                inart = Artifact(lims, id = self.steps.initialqcend['inart'])
+                process = Process(lims,id = self.steps.initialqcend['id'])
+                self.initialqc_info.update(udf_dict(inart))
+                initials = process.technician.initials
+                self.initialqc_info['initials'] = initials
+                self.initialqc_info['finish_date'] = self.steps.initialqcend['date']
+                self.initialqc_info['initial_qc_status'] = inart.qc_flag
+            if self.steps.latestCaliper:
+                self.initialqc_info['caliper_image'] = get_caliper_img(
+                                                               self.sample_name,
+                                                 self.steps.latestCaliper['id'])
+        return delete_Nones(self.initialqc_info)
 
 
 class ProcessSpec():
     def __init__(self, hist_sort, hist_list, application):
         self.application = application
+        self.init_qc = INITALQCFINISHEDLIB if application in FINLIB else INITALQC
+        self.agr_qc = AGRLIBVAL if application in FINLIB else AGRINITQC
         self.libvalends = []                
         self.libvalend = None               
         self.libvals = []
@@ -568,14 +561,25 @@ class ProcessSpec():
         self.lastseq = None
         self.caliper_procs = []
         self.latestCaliper = None
+        self.initialqcends = []
+        self.initialqcs = []
+        self.initialqcend = None
+        self.initialqcs = []
+        self.initialqstart = None
+
         self._set_prep_processes(hist_sort, hist_list)
 
     def _set_prep_processes(self, hist_sort, hist_list):
         hist_list.reverse()
-        for inart in hist_list:
-            
+        for inart in hist_list:  
             prepreplibvalends = []
             art_steps = hist_sort[inart]
+            # INITALQCEND - get last agr initialqc val step after prepreplibval
+            self.initialqcends += filter(lambda pro: pro['type'] in self.agr_qc,
+                                                            art_steps.values())
+            # INITALQCSTART - get all lib val step after prepreplibval
+            self.initialqcs += filter(lambda pro: pro['type'] in self.init_qc,
+                                                            art_steps.values())
             #1) PREPREPSTART
             self.preprepstarts += filter(lambda pro: (pro['type'] in 
                             PREPREPSTART and pro['outart']), art_steps.values())
@@ -626,7 +630,9 @@ class ProcessSpec():
             # 14) CALIPER
             self.caliper_procs += filter(lambda pro: (pro['type'] in
                                                    CALIPER), art_steps.values())
-        self.latestCaliper = get_last_first(self.caliper_procs)
+        self.latestCaliper = get_last_first(self.caliper_procs, last = True)
+        self.initialqcend = get_last_first(self.initialqcends, last = True)
+        self.initialqstart =  get_last_first(self.initialqcs, last = False)
         self.lastseq = get_last_first(self.seq)
         self.latestdem = get_last_first(self.demproc)
         self.workset = get_last_first(self.worksets) 
@@ -691,13 +697,13 @@ class Prep():
                     self.prep_info.update(udf_dict(art))
         if steps.libvalend:
             self.library_validations = self._get_lib_val_info(steps.libvalends,
-                                                            steps.libvalstart)
+                                   steps.libvalstart, steps.latestCaliper)
         if steps.prepreplibvalend:
             self.pre_prep_library_validations = self._get_lib_val_info(
                               steps.prepreplibvalends, steps.prepreplibvalstart)
 
         
-    def _get_lib_val_info(self, agrlibQCsteps, libvalstart):
+    def _get_lib_val_info(self, agrlibQCsteps, libvalstart, latest_caliper_id = None):
         library_validations = {}
         start_date = libvalstart['date'] if (libvalstart and 
                                          libvalstart.has_key('date')) else None
@@ -717,22 +723,8 @@ class Prep():
             if library_validation.has_key("size_(bp)"):
                 average_size_bp = library_validation.pop("size_(bp)")
                 library_validation["average_size_bp"] = average_size_bp
-            #adding caliper
-            caliper_procs=lims.get_processes(type=CALIPER.values(),
-                                    inputartifactlimsid = agrlibQCstep['inart'])
-            arts=[]
-            try:
-                latestCaliper=sorted(caliper_procs, key=lambda proc:proc.date_run)[-1]
-                arts=latestCaliper.all_outputs()
-            except IndexError:
-                #Caliper has not been run in libval
-                pass
-            for art in arts:
-                if (self.sample_name in [a.name for a in art.samples] and art.type == "ResultFile"):
-                    files=art.files
-                    for f in files:
-                        if ".png" in f.content_location:
-                            library_validation["caliper_image"]=f.content_location
-
+            if latest_caliper_id:
+                library_validation["caliper_image"] = get_caliper_img(self.sample_name,
+                                                            latest_caliper_id['id'])
             library_validations[agrlibQCstep['id']] = delete_Nones(library_validation)
         return delete_Nones(library_validations) 
