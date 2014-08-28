@@ -103,6 +103,8 @@ class ArchiveController(AbstractExtendedBaseController):
         f_conn = FlowcellRunMetricsConnection(username=db_info.get('user'),
                                               password=db_info.get('password'),
                                               url=db_info.get('url'))
+        swestore_paths = set(self.config.get('archive','swestore_staging').split(','))
+        swestore_dir = get_path_swestore_staging(self.pargs.flowcell, swestore_paths)
         # Create a tarball out of the run folder
         if self.pargs.package_run:
 
@@ -110,8 +112,6 @@ class ArchiveController(AbstractExtendedBaseController):
             if not self._check_pargs(["flowcell"]):
                 return
 
-            swestore_paths = set(self.config.get('archive','swestore_staging').split(','))
-            swestore_dir = get_path_swestore_staging(self.pargs.flowcell, swestore_paths)
             self.pargs.tarball = package_run(self, swestore_dir, **vars(self.pargs))
             if not self.pargs.tarball:
                 self.log.error("No tarball was created, exiting")
@@ -130,7 +130,7 @@ class ArchiveController(AbstractExtendedBaseController):
             self.log.error("Required argument --tarball was not specified")
             return
 
-        if not os.path.exists(self.pargs.tarball):
+        if not os.path.exists(os.path.join(swestore_dir, self.pargs.tarball)):
             self.log.error("Tarball {} does not exist".format(self.pargs.tarball))
             return
 
