@@ -34,16 +34,16 @@ def udf_dict(element, exeptions = [], exclude = True):
         exeptions   list of exception udf keys (underscore and lowercase)
         exlude      (True/False)"""
 
-    dict = {}
+    udf_dict = {}
     for key, val in element.udf.items():
         key = key.replace(' ', '_').lower().replace('.','')
         try: val = val.isoformat()
         except: pass
         if key in exeptions and not exclude:
-            dict[key] = val
+            udf_dict[key] = val
         elif key not in exeptions and exclude:
-            dict[key] = val
-    return dict
+            udf_dict[key] = val
+    return udf_dict
 
 def get_last_first(process_list, last=True):
     if process_list:
@@ -64,7 +64,7 @@ def get_last_first(process_list, last=True):
 class ProjectDB():
     """Instances of this class holds a dictionary formatted for building up the 
     project database on statusdb. Source of information come from different lims
-    artifacts and processes. A detailed documentation of the"""
+    artifacts and processes."""
 
     def __init__(self, lims_instance, project_id, samp_db):
         self.lims = lims_instance 
@@ -103,9 +103,9 @@ class ProjectDB():
     def _get_project_summary_info(self):
         project_summary = self.lims.get_processes(projectname =
                                 self.project.name, type = SUMMARY.values())
-        if len(project_summary) == 1:
+        if len(project_summary) > 0:
             self.obj['project_summary'] = udf_dict(project_summary[0])
-        elif len(project_summary) > 1:
+        if len(project_summary) > 1:
             print 'Warning. project summary process run more than once'
 
     def _get_sequencing_finished(self):
