@@ -401,7 +401,8 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
         storage_conf = self.app.config.get_section_dict('storage')
         archive_conf = self.app.config.get_section_dict('archive')
         swestore_paths = set(self.app.config.get_section_dict('archive').get('swestore_staging').split(','))
-        swestore_dir = get_path_swestore_staging(self.pargs.flowcell, swestore_dir)
+        run = self.pargs.tarball if self.pargs.tarball else self.pargs.flowcell
+        swestore_dir = get_path_swestore_staging(run, swestore_dir)
         servers = [server for server in storage_conf.keys()]
         server = platform.node().split('.')[0].lower()
         flowcell = self.pargs.flowcell
