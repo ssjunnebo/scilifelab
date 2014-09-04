@@ -104,7 +104,8 @@ class ArchiveController(AbstractExtendedBaseController):
                                               password=db_info.get('password'),
                                               url=db_info.get('url'))
         swestore_paths = set(self.config.get('archive','swestore_staging').split(','))
-        swestore_dir = get_path_swestore_staging(self.pargs.flowcell, swestore_paths)
+        run = self.pargs.tarball if self.pargs.tarball else self.pargs.flowcell
+        swestore_dir = get_path_swestore_staging(run, swestore_paths)
         # Create a tarball out of the run folder
         if self.pargs.package_run:
 
