@@ -49,6 +49,8 @@ def get_last_first(process_list, last=True):
     if process_list:
         process = process_list[0]
         for pro in process_list:
+            if pro['date'] is None:
+                continue
             new_date = int(pro['date'].replace('-',''))
             old_date = int(process['date'].replace('-',''))
             if last and (new_date > old_date):
