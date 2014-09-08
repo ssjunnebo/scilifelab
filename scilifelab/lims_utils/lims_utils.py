@@ -80,9 +80,10 @@ WORKSET = {'204' : 'Setup Workset/Plate'}
 SUMMARY = {'356' : 'Project Summary 1.3'}
 DEMULTIPLEX={'13' : 'Bcl Conversion & Demultiplexing (Illumina SBS) 4.0'}
 
+FINLIB = ['Finished library', 'Amplicon']
 PROJ_UDF_EXCEPTIONS = ['customer_reference','uppnex_id','reference_genome','application']
-
-SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads','m_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
+SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads',
+    'm_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
 
 CALIPER={'20' : 'CaliperGX QC (DNA)','116' : 'CaliperGX QC (RNA)'}
 
