@@ -589,7 +589,7 @@ class ProcessSpec():
                                                 LIBVAL), art_steps.values())
                 self.prepreplibvalends += filter(lambda pro: pro['type'] in
                                                 AGRLIBVAL, art_steps.values())
-            elif self.application in ['Finished library', 'Amplicon']: 
+            elif self.application in FINLIB: 
                 # 6) LIBVALSTART LIBVALEND
                 self.libvals += filter(lambda pro: pro['type'] in
                                           LIBVALFINISHEDLIB, art_steps.values())
