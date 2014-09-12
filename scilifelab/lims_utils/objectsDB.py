@@ -46,20 +46,13 @@ def udf_dict(element, exeptions = [], exclude = True):
     return udf_dict
 
 def get_last_first(process_list, last=True):
-    if process_list:
-        process = process_list[0]
-        for pro in process_list:
-            if pro['date'] is None:
-                continue
-            new_date = int(pro['date'].replace('-',''))
-            old_date = int(process['date'].replace('-',''))
-            if last and (new_date > old_date):
-                process = pro
-            elif not last and (new_date < old_date):
-                process = pro
-        return process
-    else:
-        return None
+    returned_process=None
+    for pro in process_list:
+        if (not returned_process) \
+        or (pro.get('date')>returned_process.get('date') and last) \
+        or (pro.get('date')<returned_process.get('date') and not last):
+            returned_process= pro
+    return returned_process
 
 def get_caliper_img(sample_name, caliper_id):
     caliper_image = None
@@ -440,7 +433,13 @@ class SampleDB():
                                 preps[prep.id2AB]['prep_status'] = last_libval['prep_status']
                             preps[prep.id2AB]['reagent_label'] = self._pars_reagent_labels(steps, last_libval)
         if preps.has_key('Finished'):
-            preps['Finished']['reagent_label'] = self.lims_sample.artifact.reagent_labels[0]
+            try:
+                preps['Finished']['reagent_label'] = self.lims_sample.artifact.reagent_labels[0]
+            except IndexError:
+                #P821 has nothing here
+                logging.warn("No reagent label for artifact {} in sample {}".format(self.lims_sample.artifact.id, self.name))
+                preps['Finished']['reagent_label'] = None
+
             preps['Finished'] = delete_Nones(preps['Finished'])
         
         return preps
