@@ -450,7 +450,7 @@ def _set_sample_table_values(sample_name, project_sample, barcode_seq, ordered_m
     vals['ScilifeID'] = project_sample.get("scilife_name", None)
     vals['SubmittedID'] = project_sample.get("customer_name", None)
     details = project_sample.get("details", None)
-    if not details is None:
+    if details is not None:
         vals['MSequenced'] = details.get("total_reads_(m)", None)
         vals['Status'] = details.get("status_(manual)", None)
     else:
@@ -657,7 +657,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     sample_dict = prj_summary['samples']
     param.update({key:prj_summary.get(ps_to_parameter[key], None) for key in ps_to_parameter.keys()})
     param["ordered_amount"] = param.get("ordered_amount", p_con.get_ordered_amount(project_name, samples=sample_dict))
-    if not param.get('customer_reference', None) is None:
+    if param.get('customer_reference', None) is not None:
         pass
     elif not prj_summary.get("details", None) is None:
         param['customer_reference'] = prj_summary.get('details')['customer_project_reference']
