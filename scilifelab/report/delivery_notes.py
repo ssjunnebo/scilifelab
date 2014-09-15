@@ -446,10 +446,17 @@ def _set_sample_table_values(sample_name, project_sample, barcode_seq, ordered_m
 
     :returns: vals, a dictionary of table values
     """
-    prjs_to_table = {'ScilifeID':'scilife_name', 'SubmittedID':'customer_name', 'MSequenced':'m_reads_sequenced'}#, 'MOrdered':'min_m_reads_per_sample_ordered', 'Status':'status'}
-    vals = {x:project_sample.get(prjs_to_table[x], None) for x in prjs_to_table.keys()}
-    # Set status
-    vals['Status'] = project_sample.get("status", "N/A")
+    vals = {}
+    vals['ScilifeID'] = project_sample.get("scilife_name", None)
+    vals['SubmittedID'] = project_sample.get("customer_name", None)
+    details = project_sample.get("details", None)
+    if not details is None:
+        vals['MSequenced'] = details.get("total_reads_(m)", None)
+        vals['Status'] = details.get("status_(manual)", None)
+    else:
+        vals['MSequenced'] = project_sample.get("m_reads_sequenced", None)
+        vals['Status'] = project_sample.get("status", None)
+
     if ordered_million_reads:
         param["ordered_amount"] = _get_ordered_million_reads(sample_name, ordered_million_reads)
     vals['MOrdered'] = param["ordered_amount"]
@@ -650,7 +657,12 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     sample_dict = prj_summary['samples']
     param.update({key:prj_summary.get(ps_to_parameter[key], None) for key in ps_to_parameter.keys()})
     param["ordered_amount"] = param.get("ordered_amount", p_con.get_ordered_amount(project_name, samples=sample_dict))
-    param['customer_reference'] = param.get('customer_reference', prj_summary.get('customer_reference'))
+    if not param.get('customer_reference', None) is None:
+        pass
+    elif not prj_summary.get("details", None) is None:
+        param['customer_reference'] = prj_summary.get('details')['customer_project_reference']
+    else:
+        param['customer_reference'] = prj_summary.get('customer_reference')
     param['uppnex_project_id'] = param.get('uppnex_project_id', prj_summary.get('uppnex_id'))
 
     # Override database values if options passed at command line
