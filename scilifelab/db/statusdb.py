@@ -551,9 +551,9 @@ class ProjectSummaryConnection(Couch):
         """
         source = self.get_info_source(project_name)
         if source == 'lims' and samples:
-            #Get the first project sample and extract the reads_requested_(millions)
+            #Get the first project sample and extract the reads_min
             sample_id, details = samples.items()[0]
-            amount = details.get('reads_requested_(millions)', None)
+            amount = details.get('reads_min', None)
         else:
             amount = self.get_entry(project_name, 'min_m_reads_per_sample_ordered')
         self.log.debug("got amount {}".format(amount))
