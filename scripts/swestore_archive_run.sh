@@ -56,8 +56,19 @@ fi
 
 
 # Switch to the project account, will also make sure that the iRODS module has been loaded
-module unload irods
-module load irods/swestore
+# if needed. Test ils iCommand to check that iCommands are available (even if the
+# irods module was not loaded
+module unload irods &> /dev/null
+module load irods/swestore_legacy &> /dev/null
+ils &> /dev/null
+if [ $? -ne 0 ]
+then
+    echo "There was a problem loading irods module or accessing irods commands."
+    exit 1
+else
+    echo "iCommands detected! "
+fi
+
 icd ${ROOT}/${PROJECT}
 if [ $? -ne 0 ]
 then

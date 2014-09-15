@@ -18,6 +18,7 @@ from scilifelab.bcbio import prune_pp_platform_args
 from scilifelab.bcbio.flowcell import Flowcell
 from scilifelab.bcbio.status import status_query
 from scilifelab.utils.string import strip_extensions
+from scilifelab.utils.misc import get_path_swestore_staging
 from scilifelab.pm.core.bcbio import BcbioRunController
 from scilifelab.utils.timestamp import utc_time
 from scilifelab.db.statusdb import FlowcellRunMetricsConnection
@@ -82,6 +83,8 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
         def bcbb_yaml_filter(f):
             return re.search(pattern, f) != None
         samples = filtered_walk(os.path.join(self._meta.root_path, self._meta.path_id), bcbb_yaml_filter)
+        if self.pargs.flowcell:
+            samples = [sam for sam in samples if os.path.basename(os.path.dirname(sam)) == self.pargs.flowcell]
         for s in samples:
             fc = Flowcell(s)
             fc_new = fc.subset("sample_prj", self.pargs.project)
@@ -340,9 +343,16 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
                         shutil.move(fc, os.path.join(os.path.dirname(fc), 'nosync'))
                         #Touch RTAComplete.txt file to that the modification date is the date when
                         #it was moved to nosync
-                        open(os.path.join(os.path.dirname(fc), 'nosync', os.path.basename(fc), 'RTAComplete.txt'), 'w').close()
+                        try:
+                            open(os.path.join(os.path.dirname(fc), 'nosync', os.path.basename(fc), 'RTAComplete.txt'), 'w').close()
+                        except IOError:
+                            self.app.log.warn("No RTAComplete.txt file was found for run {}." \
+                                    " Please check".format(os.path.basename(fc_name)))
                         fc_db_id = f_conn.id_view.get(fc_name)
-                        f_conn.set_storage_status(fc_db_id, 'NAS_nosync')
+                        if fc_db_id:
+                            f_conn.set_storage_status(fc_db_id, 'NAS_nosync')
+                        else:
+                            self.app.log.warn("Flowcell {} not found in the database, not changing status.".format(fc_name))
                     else:
                         self.app.log.warn("lsyncd process doesn't seem to be finished. " \
                                 "Skipping run {}".format(os.path.basename(fc)))
@@ -390,7 +400,9 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
     def sync_run(self):
         storage_conf = self.app.config.get_section_dict('storage')
         archive_conf = self.app.config.get_section_dict('archive')
-        swestore_dir = self.app.config.get_section_dict('archive').get('swestore_staging')
+        swestore_paths = set(self.app.config.get_section_dict('archive').get('swestore_staging').split(','))
+        run = self.pargs.tarball if self.pargs.tarball else self.pargs.flowcell
+        swestore_dir = get_path_swestore_staging(run, swestore_dir)
         servers = [server for server in storage_conf.keys()]
         server = platform.node().split('.')[0].lower()
         flowcell = self.pargs.flowcell
@@ -412,7 +424,7 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
                   run_dir,
                   '{}@{}:{}'.format(archive_conf.get('user'),
                                     archive_conf.get('server'),
-                                    archive_conf.get('swestore_staging'))]
+                                    swestore_dir)]
             try:
                 subprocess.check_call(cl)
             except subprocess.CalledProcessError():
