@@ -659,7 +659,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     param["ordered_amount"] = param.get("ordered_amount", p_con.get_ordered_amount(project_name, samples=sample_dict))
     if param.get('customer_reference', None) is not None:
         pass
-    elif not prj_summary.get("details", None) is None:
+    elif prj_summary.get("details", None) is not None:
         param['customer_reference'] = prj_summary.get('details')['customer_project_reference']
     else:
         param['customer_reference'] = prj_summary.get('customer_reference')
