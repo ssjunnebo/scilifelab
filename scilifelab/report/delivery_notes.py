@@ -452,7 +452,7 @@ def _set_sample_table_values(sample_name, project_sample, barcode_seq, ordered_m
     details = project_sample.get("details", None)
     try:
         vals['MSequenced'] = details["total_reads_(m)"]
-        vals['Status'] = details.["status_(manual)"]
+        vals['Status'] = details["status_(manual)"]
     except (TypeError, KeyError):
         #KeyError : no such key, TypeError: details is None
         vals['MSequenced'] = project_sample.get("m_reads_sequenced")
@@ -661,7 +661,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
 
     if not param.get('customer_reference') :
         try:
-            param['customer_reference'] = prj_summary.['details']['customer_project_reference']
+            param['customer_reference'] = prj_summary['details']['customer_project_reference']
         except (TypeError,KeyError):
             param['customer_reference'] = prj_summary.get('customer_reference')
     param['uppnex_project_id'] = param.get('uppnex_project_id', prj_summary.get('uppnex_id'))
