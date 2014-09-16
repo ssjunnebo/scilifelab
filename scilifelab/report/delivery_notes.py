@@ -566,7 +566,7 @@ def project_status_note(project_name=None, username=None, password=None, url=Non
     # parameters
     parameters = {
         "project_name" : project_name,
-        "finished" : "Not finished, or cannot yet assess if finished.",
+        "finished" : "Project is not finished, or we cannot determine its status.",
         }
 
     output_data, sample_table, param = _project_status_note_table(project_name, username, password, url,
@@ -705,7 +705,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
         # Get the project sample name from the sample run and set table values
         project_sample = sample_dict[v['sample']]
         vals = _set_sample_table_values(v['sample'], project_sample, barcode_seq, ordered_million_reads, param)
-        if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
+        if vals['Status'] in ["Ongoing","NP","N/A"]: all_passed = False
         sample_table.append([vals[k] for k in table_keys])
 
     # Loop through samples in sample_dict for which there is no sample run information
@@ -721,14 +721,14 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
             for k,v in project_sample_d.iteritems():
                 barcode_seq = s_con.get_entry(k, "sequence")
                 vals = _set_sample_table_values(sample, project_sample, barcode_seq, ordered_million_reads, param)
-                if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
+                if vals['Status'] in ["Ongoing","NP","N/A"]: all_passed = False
                 sample_table.append([vals[k] for k in table_keys])
         else:
             barcode_seq = None
             vals = _set_sample_table_values(sample, project_sample, barcode_seq, ordered_million_reads, param)
-            if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
+            if vals['Status'] in ["Ongoing","NP","N/A"]: all_passed = False
             sample_table.append([vals[k] for k in table_keys])
-    if all_passed: param["finished"] = 'Project finished.'
+    if all_passed: param["finished"] = 'Project is finished.'
     sample_table.sort()
     sample_table = list(sample_table for sample_table,_ in itertools.groupby(sample_table))
     sample_table.insert(0, ['ScilifeID', 'SubmittedID', 'BarcodeSeq', 'MSequenced', 'MOrdered', 'Status'])
