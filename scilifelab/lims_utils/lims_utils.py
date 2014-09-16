@@ -80,39 +80,13 @@ WORKSET = {'204' : 'Setup Workset/Plate'}
 SUMMARY = {'356' : 'Project Summary 1.3'}
 DEMULTIPLEX={'13' : 'Bcl Conversion & Demultiplexing (Illumina SBS) 4.0'}
 
+FINLIB = ['Finished library', 'Amplicon']
 PROJ_UDF_EXCEPTIONS = ['customer_reference','uppnex_id','reference_genome','application']
-
-SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads','m_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
+SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads',
+    'm_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
 
 CALIPER={'20' : 'CaliperGX QC (DNA)','116' : 'CaliperGX QC (RNA)'}
 
-def get_udfs(udf_key, obj, udfs, exeptions = []):
-    """Transforms udf names to statusdb keys (underscore and lowercase) and places them under
-    details in obj. If exeptions are pased as argument, those will be placed on the 
-    top level of obj
-
-    Arguments:
-    udf_key     string. name of key under wich udfs are collected.
-    obj         dictionary. Eg instance of the Samples or Project classes
-    udfs        udf dictionary
-    exeptions   list of exception udf keys (underscore and lowercase)"""
-    if not obj.has_key(udf_key):
-        obj[udf_key]={}
-    for key,val in udfs:
-        try:
-            val=_to_unicode(_from_unicode(val))
-        except:
-            pass
-        db_key = key.replace(' ','_').lower()
-        try:
-            val = val.isoformat()
-        except:
-            pass
-        if db_key in exeptions:
-            obj[db_key] = val
-        else:
-            obj[udf_key][db_key] = val
-    return obj
 
 def procHistory(proc, samplename):
     """Quick wat to get the ids of parent processes from the given process, 
