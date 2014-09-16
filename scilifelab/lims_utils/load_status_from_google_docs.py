@@ -62,7 +62,7 @@ def get_20158_info(credentials, project_name_swe):
     if len(feed.entry) != 0:
         ssheet = feed.entry[0].title.text
         version = ssheet.split(str('_20158_'))[1].split(' ')[0].split('_')[0]
-        client = SpreadSheet(credentials, ssheet) 
+        client = SpreadSheet(credentials, ssheet)
         content, ws_key, ss_key = get_google_document(ssheet,  versions[version][2], client)
         dummy, P_NP_colindex = get_column(content, versions[version][3])
         dummy, No_reads_sequenced_colindex = get_column(content, versions[version][1])
@@ -100,12 +100,13 @@ def get(project_ID, proj):
                     proj['samples'][sample]['m_reads_sequenced'] = info[sample][1]
                     if not proj['samples'][sample].has_key('details'):
                         proj['samples'][sample]['details'] = {
-                                            'status_(manual)' : info[sample][1],
-                                            'total_reads_(m)' : info[sample][0]}
+                                            'status_(manual)' : info[sample][0],
+                                            'total_reads_(m)' : info[sample][1]}
                     else:
                         if not proj['samples'][sample]['details'].has_key('status_(manual)'):
-                            proj['samples'][sample]['details']['status_(manual)'] = info[sample][1]
+                            proj['samples'][sample]['details']['status_(manual)'] = info[sample][0]
                         if not proj['samples'][sample]['details'].has_key('total_reads_(m)'):
-                            proj['samples'][sample]['details']['total_reads_(m)'] = info[sample][0]
+                            proj['samples'][sample]['details']['total_reads_(m)'] = info[sample][1]
     return proj
+
 
