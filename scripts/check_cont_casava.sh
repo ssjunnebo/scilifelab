@@ -1,4 +1,4 @@
- #!/bin/bash
+#!/bin/bash
 # Wraper for checking fastq_screen results for a specific project and flowcell
 # Assumes casava structure
 
@@ -16,9 +16,7 @@ fi
 
 fcID=$1
 project_id=$2
-
 dir=`pwd`
-
 cd  /gulo/proj_nobackup/a2010002/illumina
 
 grep Human ${project_id}/*/${fcID}/fastq_screen/*.txt | sed 's/:/\//g' | cut -f 2,6 -d '/'
@@ -30,8 +28,4 @@ echo ''
 grep Spruce ${project_id}/*/${fcID}/fastq_screen/*.txt | sed 's/:/\//g' | cut -f 2,6 -d '/'
 echo ''
 grep PhiX ${project_id}/*/${fcID}/fastq_screen/*.txt | sed 's/:/\//g' | cut -f 2,6 -d '/'
-
-
 cd $dir
-
-
