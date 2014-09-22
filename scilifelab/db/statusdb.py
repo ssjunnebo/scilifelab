@@ -549,18 +549,12 @@ class ProjectSummaryConnection(Couch):
 
         :returns: ordered amount of reads if present, None otherwise
         """
-        source = self.get_info_source(project_name)
-        if source == 'lims' and samples:
-            #Get the first project sample and extract the reads_requested_(millions)
-            sample_id, details = samples.items()[0]
-            amount = details.get('reads_requested_(millions)', None)
-        else:
+        try:
+            amount = samples.values()[0]["details"]["reads_min"]
+        except (TypeError, KeyError):
             amount = self.get_entry(project_name, 'min_m_reads_per_sample_ordered')
-        self.log.debug("got amount {}".format(amount))
-        if not amount:
-            return None
-        else:
-            return round(amount, dec)
+        finally:
+            return amount
 
     def get_latest_library_prep(self, project_name):
         """Get mapping from project name to sample_run_metrics for

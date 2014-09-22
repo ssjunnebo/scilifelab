@@ -18,7 +18,7 @@ echo "Current active sessions:"
 ssh $STAGING "psql -U $DB_USER $DB -c 'SELECT * FROM pg_stat_activity'"
 
 echo "Killing all active PostgresSQL sessions on $STAGING..."
-ssh $STAGING "psql -U $DB_USER $DB -c 'SELECT pg_terminate_backend(pg_stat_activity.procpid) FROM pg_stat_activity WHERE procpid <> pg_backend_pid();'"
+ssh $STAGING "psql -U $DB_USER $DB -c 'SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid();'"
 echo "return code: $?"
 
 #Implicit pause to give pgsql time to drop all connection

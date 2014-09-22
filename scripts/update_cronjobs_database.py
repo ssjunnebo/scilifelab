@@ -41,8 +41,9 @@ def update_cronjobs_database(couch):
         for row in server_view.rows:
             if row.key == server:
                 server_doc = cdb.get(row.value)
-                # Update the doc with the new user's cronjobs
+                # Update the doc with the new user's cronjobs, and the Last updated date
                 server_doc['users'][getpass.getuser()] = user_crontab
+                server_doc['Last updated'] = crontab_json['Last updated']
         if not server_doc:
             crontab_json['users'] = {getpass.getuser(): user_crontab}
             server_doc = crontab_json

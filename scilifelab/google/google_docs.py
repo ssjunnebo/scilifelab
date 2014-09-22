@@ -200,6 +200,20 @@ class SpreadSheet(GoogleConnection):
             return False
         return True
 
+    def delete_row(self, wsheet, index, offset):
+        """Delete an entire row at index, shifts rest of the sheet upwards. The index is 1-based and is offset by 
+        the number of rows in the spreadsheet header.
+        """
+        # Get the keys
+        ss_key = self.get_key(self.ssheet)
+        ws_key = self.get_key(wsheet)
+        try:
+            list_feed = self.client.GetListFeed(ss_key, ws_key)
+            self.client.DeleteRow(list_feed.entry[int(index - offset)])
+        except:
+            return False
+        return True
+
     def get_row_index(self, wsheet, data, offset=1):
         """Find the index (1-based) of the first row where the columns match the entries in the supplied data list
         Returns -1 if the data was not found

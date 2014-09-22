@@ -4,7 +4,6 @@
 
 Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 """
-
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
 lims = Lims(BASEURI, USERNAME, PASSWORD)
@@ -72,46 +71,73 @@ LIBVALFINISHEDLIB = {'62' : 'qPCR QC (Library Validation) 4.0',
 AGRLIBVAL = {'8': 'Aggregate QC (Library Validation) 4.0'}
 SEQSTART = {'23':'Cluster Generation (Illumina SBS) 4.0',
     '26':'Denature, Dilute and Load Sample (MiSeq) 4.0'}
+
 DILSTART = {'40' : 'Library Normalization (MiSeq) 4.0',
     '39' : 'Library Normalization (Illumina SBS) 4.0'}
 SEQUENCING = {'38' : 'Illumina Sequencing (Illumina SBS) 4.0',
     '46' : 'MiSeq Run (MiSeq) 4.0'}
 WORKSET = {'204' : 'Setup Workset/Plate'}
 SUMMARY = {'356' : 'Project Summary 1.3'}
+DEMULTIPLEX={'13' : 'Bcl Conversion & Demultiplexing (Illumina SBS) 4.0'}
 
+FINLIB = ['Finished library', 'Amplicon']
 PROJ_UDF_EXCEPTIONS = ['customer_reference','uppnex_id','reference_genome','application']
+SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads',
+    'm_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
 
-SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads','m_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
+CALIPER={'20' : 'CaliperGX QC (DNA)','116' : 'CaliperGX QC (RNA)'}
 
-def get_udfs(udf_key, obj, udfs, exeptions = []):
-    """Transforms udf names to statusdb keys (underscore and lowercase) and places them under
-    details in obj. If exeptions are pased as argument, those will be placed on the 
-    top level of obj
 
-    Arguments:
-    udf_key     string. name of key under wich udfs are collected.
-    obj         dictionary. Eg instance of the Samples or Project classes
-    udfs        udf dictionary
-    exeptions   list of exception udf keys (underscore and lowercase)"""
-    if not obj.has_key(udf_key):
-        obj[udf_key]={}
-    for key,val in udfs:
+def procHistory(proc, samplename):
+    """Quick wat to get the ids of parent processes from the given process, 
+    while staying in a sample scope"""
+    hist=[]
+    artifacts = lims.get_artifacts(sample_name = samplename, type = 'Analyte')
+    not_done=True
+    starting_art=proc.input_per_sample(samplename)[0].id
+    while not_done:
+        not_done=False 
+        for o in artifacts:
+            if o.id == starting_art:
+                if o.parent_process is None:
+                    #flow control : if there is no parent process, we can stop iterating, we're done.
+                    not_done=False
+                    break #breaks the for artifacts, we are done anyway.
+                else:
+                    not_done=True #keep the loop running
+                hist.append(o.parent_process.id)
+                for i in o.parent_process.all_inputs():
+                    if i in artifacts:
+                        # while increment
+                        starting_art=i.id
+                            
+                        break #break the for allinputs, if we found the right one
+                break # breaks the for artifacts if we matched the current one
+    return hist 
+
+def get_run_qcs(fc, lanesobj):
+    for art in fc.all_inputs():
+        lane=art.location[1][0]
+        if lane not in lanesobj:
+            #should never happen if pm works
+            lanesobj[lane]={}
+        lanesobj[lane]['seq_qc_flag']=art.qc_flag
+        dem=lims.get_processes(type=DEMULTIPLEX.values(), inputartifactlimsid=art.id)
         try:
-            val=_to_unicode(_from_unicode(val))
-        except:
-            pass
-        db_key = key.replace(' ','_').lower()
-        try:
-            val = val.isoformat()
-        except:
-            pass
-        if db_key in exeptions:
-            obj[db_key] = val
-        else:
-            obj[udf_key][db_key] = val
-    return obj
+            for outart in dem[0].all_outputs():
+                if "FASTQ reads" not in outart.name:
+                    continue
+                else:
+                    for outsample in outart.samples:
+                        #this should be only one
+                        lanesobj[lane][outsample.name]={}
+                        lanesobj[lane][outsample.name]['dem_qc_flag']=outart.qc_flag
 
+        except IndexError:
+            #No demutiplexing found. this is fine.
+            pass
 
+        
 
 def get_sequencing_info(fc):
     """Input: a process object 'fc', of type 'Illumina Sequencing (Illumina SBS) 4.0',
@@ -125,11 +151,9 @@ def get_sequencing_info(fc):
             fc_summary[lane]['qc'] = art.qc_flag
     return fc_summary
 
-
 def make_sample_artifact_maps(sample_name):
     """outin: connects each out_art for a specific sample to its 
     corresponding in_art and process. one-one relation"""
-    
     outin = {}
     artifacts = lims.get_artifacts(sample_name = sample_name, type = 'Analyte') 
     for outart in artifacts:
@@ -143,70 +167,3 @@ def make_sample_artifact_maps(sample_name):
         except:
             pass
     return outin
-
-def get_analyte_hist_sorted(out_analyte, outin, inart = None):
-    """Makes a history map of an analyte, using the outin-map 
-    of the corresponding sample.
-    The outin object is built up from analytes. This means that it will not 
-    contain output-inpit info for processes wich have only files as output. 
-    This is cusial since the outinobject is used for building upp the ANALYTE 
-    history of a sample. If you want to make the analyte history based on a 
-    resultfile, that is; if you want to give a resultfile as out_analyte here, 
-    and be given the historylist of analytes and processes for that file, you 
-    will also have to give the input artifact for the process that generated 
-    the resultfile for wich you want to get the history. In other words, if you 
-    want to get the History of the folowing scenario:        
-
-    History --- > Input_analyte -> Process -> Output_result_file
-    
-    then the arguments to this function should be:
-    out_analyte = Output_result_file
-    inart = Input_analyte
-
-    If you instead want the History of the folowing scenario:
-    
-    History --- > Input_analyte -> Process -> Output_analyte
-
-    the you can skip the inart argument and only set:
-    out_analyte = Output_analyte 
-    """
-    history = {}
-    hist_list = []
-    if inart:
-        Inart = Artifact(lims,id=inart)
-        try:
-            pro = Inart.parent_process.id
-        except:
-            pro = None
-        history, out_analyte = add_out_art_process_conection_list(inart, 
-                                                    out_analyte, history, pro)
-        hist_list.append(inart)
-    while outin.has_key(out_analyte):
-        pro, inart = outin[out_analyte]
-        hist_list.append(inart)
-        history, out_analyte = add_out_art_process_conection_list(inart, 
-                                                   out_analyte, history, pro.id)
-    return history, hist_list
-
-def add_out_art_process_conection_list(inart, out_analyte, history = {}, pro = None):
-    """This function populates the history dict with process info per artifact.
-    Maps an artifact to all the processes where its used as input and adds this 
-    info to the history dict. Obseve that the output artifavt for the input 
-    atrifact in the historychain is given as input to this funktion. All 
-    processes that the input artifakt has been involved in, but that are not 
-    part of the historychain get the outart set to None. This is verry important."""
-    processes = lims.get_processes(inputartifactlimsid = inart)
-    for process in processes:
-        outputs = map(lambda a: a.id, process.all_outputs())
-        outart = out_analyte if out_analyte in outputs else None 
-        step_info = {'date' : process.date_run,
-                     'id' : process.id,
-                     'outart' : outart,
-                     'inart' : inart,
-                     'type' : process.type.id,
-                     'name' : process.type.name}
-        if history.has_key(inart):
-            history[inart][process.id] = step_info
-        else:
-            history[inart] = {process.id : step_info}
-    return history, inart
