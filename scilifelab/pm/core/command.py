@@ -151,6 +151,8 @@ class CommandHandler(handler.CementBaseHandler):
             deliver_fn = shutil.copyfile
         elif self.app.pargs.rsync:
             deliver_fn = self._rsync
+        elif self.app.pargs.link:
+            deliver_fn = self.link
         else:
             pass
         def runpipe():

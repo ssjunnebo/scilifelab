@@ -58,6 +58,7 @@ class DeliveryController(AbstractBaseController):
         group = base_app.args.add_argument_group('delivery', 'Options affecting data delivery.')
         group.add_argument('--move', help="Transfer file with move", default=False, action="store_true")
         group.add_argument('--copy', help="Transfer file with copy", default=False, action="store_true")
+        group.add_argument('--link', help="Create directory structure at target, but symlink files", default=False, action="store_true")
         group.add_argument('--rsync', help="Transfer file with rsync (default)", default=True, action="store_true")
         group.add_argument('--intermediate', help="Work on intermediate data", default=False, action="store_true")
         group.add_argument('--data', help="Work on data folder", default=False, action="store_true")
