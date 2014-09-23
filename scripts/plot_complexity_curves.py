@@ -69,8 +69,8 @@ def main(ccurves, output_name='complexity_curves', x_min=0, x_max=500000000):
     plt.ylim(0, global_y_max_ccurve_limit + global_y_max_ccurve_limit*0.2)
     
     # label the axis
-    plt.ylabel('Unique Reads')
-    plt.xlabel('Total Reads (including duplicates)')
+    plt.ylabel('Unique Molecules')
+    plt.xlabel('Total Molecules (including duplicates)')
     plt.title("preseq Complexity Curves")
     
     # Sort out some of the nastier plotting defaults
