@@ -197,43 +197,46 @@ class DeliveryController(AbstractBaseController):
             [sample] = [s for s in samples if s.get('_id') == id]
             self.log.info("Processing sample {} and flowcell {}".format(sample.get("project_sample_name","NA"),sample.get("flowcell","NA")))
 
-            # calculate md5sums on the source side and write it on the destination
-            md5 = []
-            for f in files:
-                m = md5sum(f[0])
-                mfile = "{}.md5".format(f[1])
-                md5.append([m,mfile,f[2],f[0]])
-                self.log.debug("md5sum for source file {}: {}".format(f[0],m))
-
             # transfer files
             self.log.debug("Transferring {} fastq files".format(len(files)))
             self._transfer_files([f[0] for f in files], [f[1] for f in files])
 
-            # write the md5sum to a file at the destination and verify the transfer
             passed = True
-            for m, mfile, read, srcpath in md5:
-                dstfile = os.path.splitext(mfile)[0]
-                self.log.debug("Writing md5sum to file {}".format(mfile))
-                self.app.cmd.write(mfile,"{}  {}".format(m,os.path.basename(dstfile)),True)
-                self.log.debug("Verifying md5sum for file {}".format(dstfile))
+            if self.pargs.link or self.pargs.dry_run
+                passed = False
+            else:
+                # calculate md5sums on the source side and write it on the destination
+                md5 = []
+                for f in files:
+                    m = md5sum(f[0])
+                    mfile = "{}.md5".format(f[1])
+                    md5.append([m,mfile,f[2],f[0]])
+                    self.log.debug("md5sum for source file {}: {}".format(f[0],m))
 
-                # if dry-run, make sure verification pass
-                if self.pargs.dry_run:
-                    dm = m
-                else:
-                    dm = md5sum(dstfile)
-                self.log.debug("md5sum for destination file {}: {}".format(dstfile,dm))
-                if m != dm:
-                    self.log.warn("md5sum verification FAILED for {}. Source: {}, Target: {}".format(dstfile,m,dm))
-                    self.log.warn("Improperly transferred file {} is removed from destination, please retry transfer of this file".format(dstfile))
-                    self.app.cmd.safe_unlink(dstfile)
-                    self.app.cmd.safe_unlink(mfile)
-                    passed = False
-                    continue
+                # write the md5sum to a file at the destination and verify the transfer
+                for m, mfile, read, srcpath in md5:
+                    dstfile = os.path.splitext(mfile)[0]
+                    self.log.debug("Writing md5sum to file {}".format(mfile))
+                    self.app.cmd.write(mfile,"{}  {}".format(m,os.path.basename(dstfile)),True)
+                    self.log.debug("Verifying md5sum for file {}".format(dstfile))
 
-                # Modify the permissions to ug+rw
-                for f in [dstfile, mfile]:
-                    self.app.cmd.chmod(f,stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
+                    # if dry-run, make sure verification pass
+                    if self.pargs.dry_run:
+                        dm = m
+                    else:
+                        dm = md5sum(dstfile)
+                    self.log.debug("md5sum for destination file {}: {}".format(dstfile,dm))
+                    if m != dm:
+                        self.log.warn("md5sum verification FAILED for {}. Source: {}, Target: {}".format(dstfile,m,dm))
+                        self.log.warn("Improperly transferred file {} is removed from destination, please retry transfer of this file".format(dstfile))
+                        self.app.cmd.safe_unlink(dstfile)
+                        self.app.cmd.safe_unlink(mfile)
+                        passed = False
+                        continue
+
+                    # Modify the permissions to ug+rw
+                    for f in [dstfile, mfile]:
+                        self.app.cmd.chmod(f,stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
 
             # touch the flag to trigger uppmax inbox permission fix
             self.app.cmd.safe_touchfile(os.path.join("/sw","uppmax","var","inboxfix","schedule",self.pargs.uppmax_project))
