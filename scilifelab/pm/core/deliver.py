@@ -202,7 +202,7 @@ class DeliveryController(AbstractBaseController):
             self._transfer_files([f[0] for f in files], [f[1] for f in files])
 
             passed = True
-            if self.pargs.link or self.pargs.dry_run
+            if self.pargs.link or self.pargs.dry_run:
                 passed = False
             else:
                 # calculate md5sums on the source side and write it on the destination
@@ -219,12 +219,7 @@ class DeliveryController(AbstractBaseController):
                     self.log.debug("Writing md5sum to file {}".format(mfile))
                     self.app.cmd.write(mfile,"{}  {}".format(m,os.path.basename(dstfile)),True)
                     self.log.debug("Verifying md5sum for file {}".format(dstfile))
-
-                    # if dry-run, make sure verification pass
-                    if self.pargs.dry_run:
-                        dm = m
-                    else:
-                        dm = md5sum(dstfile)
+                    dm = md5sum(dstfile)
                     self.log.debug("md5sum for destination file {}: {}".format(dstfile,dm))
                     if m != dm:
                         self.log.warn("md5sum verification FAILED for {}. Source: {}, Target: {}".format(dstfile,m,dm))
