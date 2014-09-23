@@ -27,7 +27,7 @@ def main(ccurves, output_name='complexity_curves', x_min=0, x_max=500000000):
     global_y_max_ccurve_limit = 0
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    max_lengend_chars = 0
+    max_label_length = 0
     
     # Each ccurve will get a different color
     colormap = plt.cm.gist_ncar
@@ -59,8 +59,8 @@ def main(ccurves, output_name='complexity_curves', x_min=0, x_max=500000000):
         sample_name = os.path.splitext(ccurve)[0]
         if(sample_name[:32] == 'accepted_hits_sorted_dupRemoved_'):
             sample_name = sample_name[32:]
-        if len(sample_name) > max_lengend_chars:
-            max_lengend_chars = len(sample_name)
+        if(len(sample_name) > max_label_length):
+            max_label_length = len(sample_name)
         legend[0].append(p)
         legend[1].append(sample_name)
     
@@ -76,27 +76,17 @@ def main(ccurves, output_name='complexity_curves', x_min=0, x_max=500000000):
     # Sort out some of the nastier plotting defaults
     ax.tick_params(top=False, right=False, direction='out')
     
-    # How long are the sample names - how many columns can we have?
-    legend_cols = 1
-    if max_lengend_chars <= 10:
-        legend_cols = 3
-    elif max_lengend_chars <= 20:
-        legend_cols = 2
-    
-    # How many labels do we have? How much padding should we generate?
-    # Weird operation is a ceil - http://stackoverflow.com/questions/14822184/is-there-a-ceiling-equivalent-of-operator-in-python
-    legend_lines = -(-len(legend[1]) // legend_cols)
-    bottom_padding = (0.02*legend_lines) + 0.18 # Empirically determined
-    
-    # Set the plot size accordingly, to get an approximately square plot irrespective of how deep the legend (very rough)
-    plot_height = 8 + (bottom_padding * 8)
-    fig.set_size_inches(8, plot_height)
-    
-    # Add some spacing for the legend and position it
-    plt.subplots_adjust(bottom=bottom_padding)
-    font = {'size': 8}
-    ax.legend(legend[0], legend[1], loc=9, bbox_to_anchor=(0.5, -0.15),
-             prop=font, ncol=legend_cols)
+    # Move the subplot around to fit in the legend
+    box = ax.get_position()
+    ax.set_position([0.08, box.y0, (box.width * 0.78)-0.02, box.height])
+    font = {'size': 5}
+    if len(legend[1]) <= 20 and max_label_length <= 45:
+        font = {'size': 6}
+    if len(legend[1]) <= 20 and max_label_length <= 30:
+        font = {'size': 8}
+    if len(legend[1]) <= 20 and max_label_length <= 10:
+        font = {'size': 12}
+    ax.legend(legend[0], legend[1],loc='center left', bbox_to_anchor=(1.01, 0.5), prop=font)
     
     # now save the plot
     plt.savefig(output_name)
