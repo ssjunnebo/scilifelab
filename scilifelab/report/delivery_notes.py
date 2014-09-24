@@ -580,6 +580,10 @@ def project_status_note(project_name=None, username=None, password=None, url=Non
         paragraphs = project_note_paragraphs()
         headers = project_note_headers()
 
+        #Hack: removes Comments paragraph if it is empty
+        if not param["finished"]:
+            paragraphs.pop("Comments",None)
+
         paragraphs["Samples"]["tpl"] = make_sample_table(sample_table)
         make_note("{}_project_summary.pdf".format(project_name), headers, paragraphs, **param)
         make_rest_note("{}_project_summary.rst".format(project_name), sample_table=sample_table, report="project_report", **param)

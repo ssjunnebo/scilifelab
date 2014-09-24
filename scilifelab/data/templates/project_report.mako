@@ -31,12 +31,13 @@ Samples
 
 ${sample_table}
 
+% if finished:
 Comments
 ^^^^^^^^
 
 ${finished}
 
-
+% endif
 Information
 ^^^^^^^^^^^
 
