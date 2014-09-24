@@ -80,31 +80,37 @@ def recursive_comp(stage, prod):
                     LOG.info('Key %s differing: Lims production gives: %s. Lims stage gives %s. ' %( key,prod_val,stage_val))
     return diff
 
-def  main(proj_name, all_projects, conf):
+def  main(proj_name, all_projects, conf, only_closed):
     first_of_july = '2013-06-30'
     today = date.today()
     couch = load_couch_server(conf)
-    proj_db = couch['projects']
     if all_projects:
         projects = lims.get_projects()
         for proj in projects:
-            proj_name = proj.name
-            try:
-                proj_stage = lims_stage.get_projects(name = proj_name)
-                if len(proj_stage)==0 :
-                    LOG.warning("""Found no projects on Lims stage with name %s""" % proj_name)
-                else:
-                    proj_stage = proj_stage[0]
-                    opened = proj.open_date
-                    if opened:
-                        if comp_dates(first_of_july, opened):
-                            obj = DB.ProjectDB(lims, proj.id)
-                            obj_stage = DB.ProjectDB(lims_stage, proj.id)
-                            comp_obj(obj_stage.project, obj.project)
+            closed = proj.close_date
+            if not only_closed or (only_closed and closed):
+                contin = True
+            else:
+                contin = False
+            if contin:
+                proj_name = proj.name
+                try:
+                    proj_stage = lims_stage.get_projects(name = proj_name)
+                    if len(proj_stage)==0 :
+                        LOG.warning("""Found no projects on Lims stage with name %s""" % proj_name)
                     else:
-                        LOG.info('Open date missing for project %s' % proj_name)
-            except:
-                LOG.info('Failed comparing stage and prod for proj %s' % proj_name)    
+                        proj_stage = proj_stage[0]
+                        opened = proj.open_date
+                        if opened:
+                            if comp_dates(first_of_july, opened):
+                                obj = DB.ProjectDB(lims, proj.id, None)
+                                obj_stage = DB.ProjectDB(lims_stage, proj.id, None)
+                                print
+                                comp_obj(obj_stage.obj, obj.obj)
+                        else:
+                            LOG.info('Open date missing for project %s' % proj_name)
+                except:
+                    LOG.info('Failed comparing stage and prod for proj %s' % proj_name)    
     elif proj_name is not None:
         proj = lims.get_projects(name = proj_name)
         proj_stage = lims_stage.get_projects(name = proj_name)
@@ -122,9 +128,9 @@ def  main(proj_name, all_projects, conf):
                     cont = raw_input("""The project %s is opened before 2013-07-01. 
                     Do you still want to load the data from lims into statusdb? (yes/no): """ % proj_name)
                 if cont == 'yes':
-                    obj = DB.ProjectDB(lims, proj.id)
-                    obj_stage = DB.ProjectDB(lims_stage, proj.id)
-                    comp_obj(obj_stage.project, obj.project)
+                    obj = DB.ProjectDB(lims, proj.id, samp_db)
+                    obj_stage = DB.ProjectDB(lims_stage, proj.id, samp_db)
+                    comp_obj(obj_stage.obj, obj.obj)
             else:
                 LOG.info('Open date missing for project %s' % proj_name)
 
@@ -135,14 +141,16 @@ if __name__ == '__main__':
     help = "eg: M.Uhlen_13_01. Dont use with -a flagg.")
 
     parser.add_option("-a", "--all_projects", dest="all_projects", action="store_true", default=False,
-    help = "Upload all Lims projects into couchDB. Don't use with -f flagg.")
+    help = "Upload all Lims projects into couchDB. Don't use with -p flagg.")
+
+    parser.add_option("-C", "--closed_projects", dest="closed_projects", action="store_true", default=False,
+    help = "Upload only closed projects. Use with -a flagg.")
 
     parser.add_option("-c", "--conf", dest="conf", 
     default=os.path.join(os.environ['HOME'],'opt/config/post_process.yaml'),         
     help = "Config file.  Default: ~/opt/config/post_process.yaml")
 
     (options, args) = parser.parse_args()
-
     LOG = scilifelab.log.file_logger('LOG',options.conf ,'validate_LIMS_upgrade.log', 'log_dir_tools')
-    main(options.project_name, options.all_projects, options.conf)
+    main(options.project_name, options.all_projects, options.conf, options.closed_projects)
 
