@@ -338,7 +338,7 @@ class SampleDB():
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
                                                            lims_run, preps[key],
                                                           steps.lastseq['type'])
-                            if samp_run_met_id:
+                            if samp_run_met_id and self.samp_db:
                                 srmi = find_sample_run_id_from_view(self.samp_db,
                                                                  samp_run_met_id)
                                 dpsd = steps.dilstart['date'] if steps.dilstart else None
