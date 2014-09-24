@@ -128,8 +128,8 @@ def  main(proj_name, all_projects, conf, only_closed):
                     cont = raw_input("""The project %s is opened before 2013-07-01. 
                     Do you still want to load the data from lims into statusdb? (yes/no): """ % proj_name)
                 if cont == 'yes':
-                    obj = DB.ProjectDB(lims, proj.id, samp_db)
-                    obj_stage = DB.ProjectDB(lims_stage, proj.id, samp_db)
+                    obj = DB.ProjectDB(lims, proj.id, None)
+                    obj_stage = DB.ProjectDB(lims_stage, proj.id, None)
                     comp_obj(obj_stage.obj, obj.obj)
             else:
                 LOG.info('Open date missing for project %s' % proj_name)
