@@ -19,8 +19,11 @@ import objectsDB as DB
 from datetime import date
 import time
 import scilifelab.log
+import threading
+import Queue 
 lims = Lims(BASEURI, USERNAME, PASSWORD)
 LOG = scilifelab.log.minimal_logger('LOG')
+queue=Queue.Queue()
    
 class PSUL():
     def __init__(self, proj, samp_db, proj_db, upload_data, days, man_name, output_f):
@@ -116,7 +119,7 @@ class PSUL():
             return ('Issues geting info for {name}. The "Application" udf might'
                                          ' be missing'.format(name = self.name))
 
-    def project_update_and_logging(self, proj_num = '', num_projs = ''):
+    def project_update_and_logging(self):
         start_time = time.time()
         self.get_ordered_opened()
         if self.ordered_opened:
@@ -125,22 +128,24 @@ class PSUL():
             log_info = ('No open date or order date found for project {name}. '
                         'Project not updated.'.format(name = self.name))
         elapsed = time.time() - start_time
-        LOG.info('Time - {elapsed} : Proj - {proj_num}/{num_projs} : Name - '
-                 '{name}'.format(elapsed = elapsed, proj_num = proj_num,
-                 num_projs = num_projs, name = self.name))
+        LOG.info('Time - {elapsed} : Proj Name - '
+                 '{name}'.format(elapsed = elapsed, name = self.name))
         LOG.info(log_info) 
 
-def main(man_name, all_projects, days, conf, upload_data, output_f = None):
+def main(options):
+    man_name=options.project_name
+    all_projects=options.all_projects
+    days=options.days
+    conf=options.conf
+    upload_data=options.upload
+    output_f = options.output_f
     couch = load_couch_server(conf)
     proj_db = couch['projects']
     samp_db = couch['samples']
 
     if all_projects:
         projects = lims.get_projects()
-        num_projs = len(projects)
-        for proj_num, proj in enumerate(projects):
-            P = PSUL(proj, samp_db, proj_db, upload_data, days, man_name, output_f)
-            P.project_update_and_logging(proj_num, num_projs)
+        masterThread(options,projects)
     elif man_name:
         proj = lims.get_projects(name = man_name)
         if not proj:
@@ -149,6 +154,41 @@ def main(man_name, all_projects, days, conf, upload_data, output_f = None):
         else:
             P = PSUL(proj[0], samp_db, proj_db, upload_data, days, man_name, output_f)
             P.project_update_and_logging()
+
+class ThreadPSUL(threading.Thread):
+    def __init__(self, options,queue):
+        threading.Thread.__init__(self)
+        self.options=options
+        self.queue = queue
+        couch = load_couch_server(options.conf)
+        self.proj_db = couch['projects']
+        self.samp_db = couch['samples']
+    def run(self):
+        while True:
+            #grabs host from queue
+            proj = self.queue.get(block=True, timeout=2)
+            print("handling project {}".format(proj.name))
+            print("{} {} {} {}".format(options.upload, options.days, options.project_name, options.output_f))
+            P = PSUL(proj, self.samp_db, self.proj_db, options.upload, options.days, options.project_name, options.output_f)
+            P.project_update_and_logging()
+            #signals to queue job is done
+            self.queue.task_done()
+            if self.queue.empty()  :
+                break
+
+
+def masterThread(options,projectList):
+#spawn a pool of threads, and pass them queue instance 
+    for i in range(options.threads):
+        t = ThreadPSUL(options,queue)
+        t.start()
+#populate queue with data   
+    for proj in projectList:
+        queue.put(proj)
+
+#wait on the queue until everything has been processed     
+    queue.join()
+                  
 
 if __name__ == '__main__':
     usage = "Usage:       python project_summary_upload_LIMS.py [options]"
@@ -169,12 +209,13 @@ if __name__ == '__main__':
                       "should not be uploaded, but printed to output_f, or to ",
                       "stdout"))
     parser.add_option("--output_f", dest = "output_f", help = ("Output file",
-                      " that will be used only if --no_upload tag is used"))
+                      " that will be used only if --no_upload tag is used"), default=None)
+    parser.add_option("-t", "--threads", dest = "threads", default = 4,
+                      help = "How many threads will be spawned. Will only work with -a")
 
     (options, args) = parser.parse_args()
     LOG = scilifelab.log.file_logger('LOG', options.conf, 'lims2db_projects.log'
                                                                ,'log_dir_tools')
  
-    main(options.project_name, options.all_projects, options.days, options.conf,
-         upload_data = options.upload, output_f = options.output_f)
+    main(options)
 
