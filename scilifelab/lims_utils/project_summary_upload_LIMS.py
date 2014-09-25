@@ -23,7 +23,7 @@ import threading
 import Queue 
 lims = Lims(BASEURI, USERNAME, PASSWORD)
 LOG = scilifelab.log.minimal_logger('LOG')
-queue=Queue.Queue()
+projectsQueue=Queue.Queue()
    
 class PSUL():
     def __init__(self, proj, samp_db, proj_db, upload_data, days, man_name, output_f):
@@ -165,11 +165,9 @@ class ThreadPSUL(threading.Thread):
         self.samp_db = couch['samples']
     def run(self):
         while True:
-            #grabs host from queue
+            #grabs project from queue
             proj = self.queue.get(block=True, timeout=2)
-            print("handling project {}".format(proj.name))
-            print("{} {} {} {}".format(options.upload, options.days, options.project_name, options.output_f))
-            P = PSUL(proj, self.samp_db, self.proj_db, options.upload, options.days, options.project_name, options.output_f)
+            P = PSUL(proj, self.samp_db, self.proj_db, self.options.upload, self.options.days, self.options.project_name, self.options.output_f)
             P.project_update_and_logging()
             #signals to queue job is done
             self.queue.task_done()
@@ -180,14 +178,14 @@ class ThreadPSUL(threading.Thread):
 def masterThread(options,projectList):
 #spawn a pool of threads, and pass them queue instance 
     for i in range(options.threads):
-        t = ThreadPSUL(options,queue)
+        t = ThreadPSUL(options,projectsQueue)
         t.start()
 #populate queue with data   
     for proj in projectList:
-        queue.put(proj)
+        projectsQueue.put(proj)
 
 #wait on the queue until everything has been processed     
-    queue.join()
+    projectsQueue.join()
                   
 
 if __name__ == '__main__':
