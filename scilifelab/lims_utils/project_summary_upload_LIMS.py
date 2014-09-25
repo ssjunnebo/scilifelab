@@ -210,7 +210,7 @@ if __name__ == '__main__':
                       "stdout"))
     parser.add_option("--output_f", dest = "output_f", help = ("Output file",
                       " that will be used only if --no_upload tag is used"), default=None)
-    parser.add_option("-t", "--threads", dest = "threads", default = 4,
+    parser.add_option("-t", "--threads", type='int', dest = "threads", default = 4,
                       help = "How many threads will be spawned. Will only work with -a")
 
     (options, args) = parser.parse_args()
