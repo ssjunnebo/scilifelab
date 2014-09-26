@@ -117,6 +117,7 @@ class AbstractExtendedBaseController(AbstractBaseController):
         group = base_app.args.add_argument_group('file transfer', 'Options affecting file transfer operations.')
         group.add_argument('--move', help="Transfer file with move", default=False, action="store_true")
         group.add_argument('--copy', help="Transfer file with copy (default)", default=True, action="store_true")
+        group.add_argument('--link', help="Transfer file by creating symlinks", default=False, action="store_true")
         group.add_argument('--rsync', help="Transfer file with rsync", default=False, action="store_true")
 
         group = base_app.args.add_argument_group('compression/decompression', 'Options affecting compression/decompression.')
@@ -176,6 +177,10 @@ class AbstractExtendedBaseController(AbstractBaseController):
             self.pargs.copy = False
         elif self.pargs.rsync:
             self.pargs.copy = False
+
+        # Linking files not supported, probably never will
+        if self.pargs.link:
+            raise NotImplementedError('Linking files is not supported for this command')
 
         #We don't want to check on produciton root for all commands that require flowcell
         no_check = ['swestore', 'sync_run']
