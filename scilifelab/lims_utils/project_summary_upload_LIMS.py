@@ -110,7 +110,10 @@ class PSUL():
             key = find_proj_from_view(self.proj_db, self.name)
             project.obj['_id'] = find_or_make_key(key)
             if not opended_after_140630:
-                project.obj = load_status_from_google_docs.get(self.name, project.obj)
+                try:
+                    project.obj = load_status_from_google_docs.get(self.name, project.obj)
+                except RequestError:
+                    return "Failed to get the 20158 spreadsheet for project self.id"
             if self.upload_data:
                 info = save_couchdb_obj(self.proj_db, project.obj)
             else:
