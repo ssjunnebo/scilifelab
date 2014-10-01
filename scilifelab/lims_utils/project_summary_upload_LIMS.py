@@ -174,7 +174,7 @@ def processPSUL(options, queue):
             work=False
             print("{} exiting gracefully".format(procName))
             break
-        print("{} working on {}").format(procName, projname)
+        print("{} working on {}".format(procName, projname))
         proj=mylims.get_projects(name=projname)[0]
         P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f)
         P.project_update_and_logging()
