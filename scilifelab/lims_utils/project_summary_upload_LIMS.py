@@ -165,15 +165,16 @@ def processPSUL(options, queue):
     samp_db = couch['samples']
     mylims = Lims(BASEURI, USERNAME, PASSWORD)
     work=True
+    procName=mp.current_process().name
     while work:
         #grabs project from queue
         try:
             projname = queue.get(block=True, timeout=3)
         except Queue.Empty:
             work=False
-            print("exiting gracefully")
+            print("{} exiting gracefully".format(procName))
             break
-        print("{} working on {}").format(multiprocessing.current_process().name, projname)
+        print("{} working on {}").format(procName, projname)
         proj=mylims.get_projects(name=projname)[0]
         P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f)
         P.project_update_and_logging()
@@ -182,17 +183,22 @@ def processPSUL(options, queue):
 
 def masterProcess(options,projectList):
     projectsQueue=mp.JoinableQueue()
-    proclist=[]
+    mainlims=Lims(BASEURI, USERNAME, PASSWORD)
+#Initial step : order projects by sample number:
+    orderedprojectlist=sorted(projectList, key=getSampleNumber, reverse=True)
 #spawn a pool of processes, and pass them queue instance 
     for i in range(options.processes):
         p = mp.Process(target=processPSUL, args=(options,projectsQueue))
         p.start()
 #populate queue with data   
-    for proj in projectList:
+    for proj in orderedprojectlist:
         projectsQueue.put(proj.name)
 
 #wait on the queue until everything has been processed     
     projectsQueue.join()
+def getSampleNumber(project):
+    sp=lims.get_sample_number(projectname=project.name)
+    return sp
                   
 if __name__ == '__main__':
     usage = "Usage:       python project_summary_upload_LIMS.py [options]"
