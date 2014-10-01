@@ -20,7 +20,6 @@ from datetime import date
 import time
 import scilifelab.log
 import multiprocessing as mp
-import pickle
 import Queue
 
 
@@ -113,7 +112,7 @@ class PSUL():
                 try:
                     project.obj = load_status_from_google_docs.get(self.name, project.obj)
                 except RequestError:
-                    return "Failed to get the 20158 spreadsheet for project self.id"
+                    return "Failed to get the 20158 spreadsheet for project{}".format(self.id)
             if self.upload_data:
                 info = save_couchdb_obj(self.proj_db, project.obj)
             else:
@@ -174,14 +173,12 @@ def processPSUL(options, queue):
             work=False
             print("exiting gracefully")
             break
-        #print(projname)
+        print("{} working on {}").format(multiprocessing.current_process().name, projname)
         proj=mylims.get_projects(name=projname)[0]
-        #print(proj)
         P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f)
         P.project_update_and_logging()
         #signals to queue job is done
         queue.task_done()
-
 
 def masterProcess(options,projectList):
     projectsQueue=mp.JoinableQueue()
@@ -197,7 +194,6 @@ def masterProcess(options,projectList):
 #wait on the queue until everything has been processed     
     projectsQueue.join()
                   
-
 if __name__ == '__main__':
     usage = "Usage:       python project_summary_upload_LIMS.py [options]"
     parser = OptionParser(usage=usage)
