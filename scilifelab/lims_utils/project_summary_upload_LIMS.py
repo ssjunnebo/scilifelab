@@ -19,11 +19,12 @@ import objectsDB as DB
 from datetime import date
 import time
 import scilifelab.log
-import threading
-import Queue 
+import multiprocessing as mp
+import Queue
+
+
 lims = Lims(BASEURI, USERNAME, PASSWORD)
 LOG = scilifelab.log.minimal_logger('LOG')
-projectsQueue=Queue.Queue()
    
 class PSUL():
     def __init__(self, proj, samp_db, proj_db, upload_data, days, man_name, output_f):
@@ -108,7 +109,10 @@ class PSUL():
             key = find_proj_from_view(self.proj_db, self.name)
             project.obj['_id'] = find_or_make_key(key)
             if not opended_after_140630:
-                project.obj = load_status_from_google_docs.get(self.name, project.obj)
+                try:
+                    project.obj = load_status_from_google_docs.get(self.name, project.obj)
+                except RequestError:
+                    return "Failed to get the 20158 spreadsheet for project{}".format(self.id)
             if self.upload_data:
                 info = save_couchdb_obj(self.proj_db, project.obj)
             else:
@@ -145,7 +149,7 @@ def main(options):
 
     if all_projects:
         projects = lims.get_projects()
-        masterThread(options,projects)
+        masterProcess(options,projects)
     elif man_name:
         proj = lims.get_projects(name = man_name)
         if not proj:
@@ -155,39 +159,41 @@ def main(options):
             P = PSUL(proj[0], samp_db, proj_db, upload_data, days, man_name, output_f)
             P.project_update_and_logging()
 
-class ThreadPSUL(threading.Thread):
-    def __init__(self, options,queue):
-        threading.Thread.__init__(self)
-        self.options=options
-        self.queue = queue
-        couch = load_couch_server(options.conf)
-        self.proj_db = couch['projects']
-        self.samp_db = couch['samples']
-    def run(self):
-        while True:
-            #grabs project from queue
-            proj = self.queue.get(block=True, timeout=2)
-            P = PSUL(proj, self.samp_db, self.proj_db, self.options.upload, self.options.days, self.options.project_name, self.options.output_f)
-            P.project_update_and_logging()
-            #signals to queue job is done
-            self.queue.task_done()
-            if self.queue.empty()  :
-                break
+def processPSUL(options, queue):
+    couch = load_couch_server(options.conf)
+    proj_db = couch['projects']
+    samp_db = couch['samples']
+    mylims = Lims(BASEURI, USERNAME, PASSWORD)
+    work=True
+    while work:
+        #grabs project from queue
+        try:
+            projname = queue.get(block=True, timeout=3)
+        except Queue.Empty:
+            work=False
+            print("exiting gracefully")
+            break
+        print("{} working on {}").format(multiprocessing.current_process().name, projname)
+        proj=mylims.get_projects(name=projname)[0]
+        P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f)
+        P.project_update_and_logging()
+        #signals to queue job is done
+        queue.task_done()
 
-
-def masterThread(options,projectList):
-#spawn a pool of threads, and pass them queue instance 
-    for i in range(options.threads):
-        t = ThreadPSUL(options,projectsQueue)
-        t.start()
+def masterProcess(options,projectList):
+    projectsQueue=mp.JoinableQueue()
+    proclist=[]
+#spawn a pool of processes, and pass them queue instance 
+    for i in range(options.processes):
+        p = mp.Process(target=processPSUL, args=(options,projectsQueue))
+        p.start()
 #populate queue with data   
     for proj in projectList:
-        projectsQueue.put(proj)
+        projectsQueue.put(proj.name)
 
 #wait on the queue until everything has been processed     
     projectsQueue.join()
                   
-
 if __name__ == '__main__':
     usage = "Usage:       python project_summary_upload_LIMS.py [options]"
     parser = OptionParser(usage=usage)
@@ -208,8 +214,8 @@ if __name__ == '__main__':
                       "stdout"))
     parser.add_option("--output_f", dest = "output_f", help = ("Output file",
                       " that will be used only if --no_upload tag is used"), default=None)
-    parser.add_option("-t", "--threads", type='int', dest = "threads", default = 4,
-                      help = "How many threads will be spawned. Will only work with -a")
+    parser.add_option("-m", "--multiprocs", type='int', dest = "processes", default = 4,
+                      help = "How many processes will be spawned. Will only work with -a")
 
     (options, args) = parser.parse_args()
     LOG = scilifelab.log.file_logger('LOG', options.conf, 'lims2db_projects.log'
