@@ -119,7 +119,7 @@ class PSUL():
                 info = self.print_couchdb_obj_to_file(project.obj)
             return "project {name} is handled and {info}: _id = {id}".format(
                                name=self.name, info=info, id=project.obj['_id'])
-        except ZeroDivisionError:
+        except :
             return ('Issues geting info for {name}. The "Application" udf might'
                                          ' be missing'.format(name = self.name))
 
@@ -155,17 +155,7 @@ def main(options):
     mainlog.addHandler(mfh)
 
     if all_projects:
-        test=['J.Frisen_14_04', 'J.Lundeberg_14_19',
-                        'V.Hurry_14_03',
-                        'A.Blomberg_14_13',
-                        'A.Blomberg_14_14',
-                        'J.Lindberg_14_04',
-                        'L.Gan_14_01',
-                        'L.Gan_14_02',
-                        'E.SykLundberg_14_03',
-                        'K.Spalding_14_02',
-                        'J.Larsson_14_02']
-        projects = mainlims.get_projects(name=test)
+        projects = mainlims.get_projects()
         masterProcess(options,projects, mainlims, mainlog)
     elif man_name:
         proj = mainlims.get_projects(name = man_name)
@@ -208,6 +198,7 @@ def processPSUL(options, queue, logqueue):
 def masterProcess(options,projectList, mainlims, logger):
     projectsQueue=mp.JoinableQueue()
     logQueue=mp.Queue()
+    childs=[]
 #Initial step : order projects by sample number:
     logger.info("ordering the project list")
     orderedprojectlist=sorted(projectList, key=lambda x: (mainlims.get_sample_number(x.name)), reverse=True)
@@ -216,6 +207,7 @@ def masterProcess(options,projectList, mainlims, logger):
     for i in range(options.processes):
         p = mp.Process(target=processPSUL, args=(options,projectsQueue, logQueue))
         p.start()
+        childs.append(p)
 #populate queue with data   
     for proj in orderedprojectlist:
         projectsQueue.put(proj.name)
@@ -223,11 +215,21 @@ def masterProcess(options,projectList, mainlims, logger):
 #wait on the queue until everything has been processed     
     notDone=True
     while notDone:
-        log=logQueue.get()
-        logger.handle(log)
-        if projectsQueue.empty() and logQueue.empty():
-            notDone=False
-            break
+        try:
+            log=logQueue.get(False)
+            logger.handle(log)
+        except Queue.Empty:
+            if not stillRunning(childs):
+                notDone=False
+                break
+
+def stillRunning(processList):
+    ret=False
+    for p in processList:
+        if p.is_alive():
+            ret=True
+
+    return ret
 
 class QueueHandler(logging.Handler):
     """
