@@ -50,7 +50,9 @@ PREPSTART = {'10' : 'Aliquot Libraries for Hybridization (SS XT)',
     '407' : 'Fragment DNA (ThruPlex)',
     '308': 'Library Pooling (TruSeq Small RNA) 1.0',
     '117' : 'Applications Generic Process',
+    '605' : 'Tagmentation, Strand displacement and AMPure purification',
     '405' : 'RiboZero depletion'}
+
 PREPEND = {'157': 'Applications Finish Prep',
     '109' : 'CA Purification',
     '456' : 'Purification (ThruPlex)',
