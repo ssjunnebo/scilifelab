@@ -579,7 +579,7 @@ class BestPracticeReportController(AbstractBaseController):
         if not self._check_pargs(["project"]):
             return
         if not self.pargs.statusdb_project_name:
-            self.statusdb_project_name = self.pargs.project
+            self.pargs.statusdb_project_name = self.pargs.project
         kw = vars(self.pargs)
         basedir = os.path.abspath(os.path.join(self.app.controller._meta.root_path, self.app.controller._meta.path_id))
         flist = find_samples(basedir, **vars(self.pargs))
