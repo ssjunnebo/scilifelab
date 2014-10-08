@@ -119,7 +119,7 @@ class PSUL():
                 info = self.print_couchdb_obj_to_file(project.obj)
             return "project {name} is handled and {info}: _id = {id}".format(
                                name=self.name, info=info, id=project.obj['_id'])
-        except :
+        except:
             return ('Issues geting info for {name}. The "Application" udf might'
                                          ' be missing'.format(name = self.name))
 
@@ -199,20 +199,20 @@ def masterProcess(options,projectList, mainlims, logger):
     projectsQueue=mp.JoinableQueue()
     logQueue=mp.Queue()
     childs=[]
-#Initial step : order projects by sample number:
+    #Initial step : order projects by sample number:
     logger.info("ordering the project list")
     orderedprojectlist=sorted(projectList, key=lambda x: (mainlims.get_sample_number(x.name)), reverse=True)
     logger.info("done ordering the project list")
-#spawn a pool of processes, and pass them queue instance 
+    #spawn a pool of processes, and pass them queue instance 
     for i in range(options.processes):
         p = mp.Process(target=processPSUL, args=(options,projectsQueue, logQueue))
         p.start()
         childs.append(p)
-#populate queue with data   
+    #populate queue with data   
     for proj in orderedprojectlist:
         projectsQueue.put(proj.name)
 
-#wait on the queue until everything has been processed     
+    #wait on the queue until everything has been processed     
     notDone=True
     while notDone:
         try:
