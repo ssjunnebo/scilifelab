@@ -18,16 +18,14 @@ from genologics.config import BASEURI, USERNAME, PASSWORD
 import objectsDB as DB
 from datetime import date
 import time
-import scilifelab.log
 import multiprocessing as mp
 import Queue
+import logging
+import logging.handlers
 
-
-lims = Lims(BASEURI, USERNAME, PASSWORD)
-LOG = scilifelab.log.minimal_logger('LOG')
    
 class PSUL():
-    def __init__(self, proj, samp_db, proj_db, upload_data, days, man_name, output_f):
+    def __init__(self, proj, samp_db, proj_db, upload_data, days, man_name, output_f, log):
         self.proj = proj
         self.id = proj.id
         self.udfs = proj.udf
@@ -41,6 +39,8 @@ class PSUL():
         self.days = days
         self.output_f = output_f
         self.ordered_opened = None
+        self.lims = Lims(BASEURI, USERNAME, PASSWORD)
+        self.log=log
 
     def print_couchdb_obj_to_file(self, obj):
         if self.output_f is not None:
@@ -57,7 +57,7 @@ class PSUL():
         elif 'Order received' in dict(self.udfs.items()).keys():
             self.ordered_opened = self.udfs['Order received'].isoformat()
         else:
-            LOG.info("Project is not updated because 'Order received' date and "
+            self.log.info("Project is not updated because 'Order received' date and "
                      "'open date' is missing for project {name}".format(
                      name = self.name))
 
@@ -104,8 +104,8 @@ class PSUL():
         """Fetch project info and update project in the database."""
         opended_after_140630 = comp_dates('2014-06-30', self.ordered_opened)
         try:
-            LOG.info('Handeling {proj}'.format(proj = self.name))
-            project = database.ProjectDB(lims, self.id, self.samp_db)
+            self.log.info('Handeling {proj}'.format(proj = self.name))
+            project = database.ProjectDB(self.lims, self.id, self.samp_db)
             key = find_proj_from_view(self.proj_db, self.name)
             project.obj['_id'] = find_or_make_key(key)
             if not opended_after_140630:
@@ -132,9 +132,9 @@ class PSUL():
             log_info = ('No open date or order date found for project {name}. '
                         'Project not updated.'.format(name = self.name))
         elapsed = time.time() - start_time
-        LOG.info('Time - {elapsed} : Proj Name - '
+        self.log.info('Time - {elapsed} : Proj Name - '
                  '{name}'.format(elapsed = elapsed, name = self.name))
-        LOG.info(log_info) 
+        self.log.info(log_info) 
 
 def main(options):
     man_name=options.project_name
@@ -146,53 +146,154 @@ def main(options):
     couch = load_couch_server(conf)
     proj_db = couch['projects']
     samp_db = couch['samples']
+    mainlims = Lims(BASEURI, USERNAME, PASSWORD)
+    mainlog=logging.getLogger('psullogger')
+    mainlog.setLevel(level=logging.INFO)
+    mfh = logging.FileHandler(options.logfile)
+    mft = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    mfh.setFormatter(mft)
+    mainlog.addHandler(mfh)
 
     if all_projects:
-        projects = lims.get_projects()
-        masterProcess(options,projects)
+        projects = mainlims.get_projects()
+        masterProcess(options,projects, mainlims, mainlog)
     elif man_name:
-        proj = lims.get_projects(name = man_name)
+        proj = mainlims.get_projects(name = man_name)
         if not proj:
-            LOG.warning('No project named {man_name} in Lims'.format(
+            mainlog.warn('No project named {man_name} in Lims'.format(
                         man_name = man_name))
         else:
-            P = PSUL(proj[0], samp_db, proj_db, upload_data, days, man_name, output_f)
+            P = PSUL(proj[0], samp_db, proj_db, upload_data, days, man_name, output_f, mainlog)
             P.project_update_and_logging()
 
-def processPSUL(options, queue):
+def processPSUL(options, queue, logqueue):
     couch = load_couch_server(options.conf)
     proj_db = couch['projects']
     samp_db = couch['samples']
     mylims = Lims(BASEURI, USERNAME, PASSWORD)
     work=True
+    procName=mp.current_process().name
+    proclog=logging.getLogger(procName)
+    proclog.setLevel(level=logging.INFO)
+    mfh = QueueHandler(logqueue)
+    mft = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    mfh.setFormatter(mft)
+    proclog.addHandler(mfh)
+
     while work:
         #grabs project from queue
         try:
             projname = queue.get(block=True, timeout=3)
         except Queue.Empty:
             work=False
-            print("exiting gracefully")
+            proclog.info("exiting gracefully")
             break
-        print("{} working on {}").format(multiprocessing.current_process().name, projname)
-        proj=mylims.get_projects(name=projname)[0]
-        P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f)
-        P.project_update_and_logging()
-        #signals to queue job is done
-        queue.task_done()
+        else:
+            proj=mylims.get_projects(name=projname)[0]
+            P = PSUL(proj, samp_db, proj_db, options.upload, options.days, options.project_name, options.output_f, proclog)
+            P.project_update_and_logging()
+            #signals to queue job is done
+            queue.task_done()
 
-def masterProcess(options,projectList):
+def masterProcess(options,projectList, mainlims, logger):
     projectsQueue=mp.JoinableQueue()
-    proclist=[]
-#spawn a pool of processes, and pass them queue instance 
+    logQueue=mp.Queue()
+    childs=[]
+    #Initial step : order projects by sample number:
+    logger.info("ordering the project list")
+    orderedprojectlist=sorted(projectList, key=lambda x: (mainlims.get_sample_number(x.name)), reverse=True)
+    logger.info("done ordering the project list")
+    #spawn a pool of processes, and pass them queue instance 
     for i in range(options.processes):
-        p = mp.Process(target=processPSUL, args=(options,projectsQueue))
+        p = mp.Process(target=processPSUL, args=(options,projectsQueue, logQueue))
         p.start()
-#populate queue with data   
-    for proj in projectList:
+        childs.append(p)
+    #populate queue with data   
+    for proj in orderedprojectlist:
         projectsQueue.put(proj.name)
 
-#wait on the queue until everything has been processed     
-    projectsQueue.join()
+    #wait on the queue until everything has been processed     
+    notDone=True
+    while notDone:
+        try:
+            log=logQueue.get(False)
+            logger.handle(log)
+        except Queue.Empty:
+            if not stillRunning(childs):
+                notDone=False
+                break
+
+def stillRunning(processList):
+    ret=False
+    for p in processList:
+        if p.is_alive():
+            ret=True
+
+    return ret
+
+class QueueHandler(logging.Handler):
+    """
+    This handler sends events to a queue. Typically, it would be used together
+    with a multiprocessing Queue to centralise logging to file in one process
+    (in a multi-process application), so as to avoid file write contention
+    between processes.
+
+    This code is new in Python 3.2, but this class can be copy pasted into
+    user code for use with earlier Python versions.
+    """
+
+    def __init__(self, queue):
+        """
+        Initialise an instance, using the passed queue.
+        """
+        logging.Handler.__init__(self)
+        self.queue = queue
+
+    def enqueue(self, record):
+        """
+        Enqueue a record.
+
+        The base implementation uses put_nowait. You may want to override
+        this method if you want to use blocking, timeouts or custom queue
+        implementations.
+        """
+        self.queue.put_nowait(record)
+
+    def prepare(self, record):
+        """
+        Prepares a record for queuing. The object returned by this method is
+        enqueued.
+
+        The base implementation formats the record to merge the message
+        and arguments, and removes unpickleable items from the record
+        in-place.
+
+        You might want to override this method if you want to convert
+        the record to a dict or JSON string, or send a modified copy
+        of the record while leaving the original intact.
+        """
+        # The format operation gets traceback text into record.exc_text
+        # (if there's exception data), and also puts the message into
+        # record.message. We can then use this to replace the original
+        # msg + args, as these might be unpickleable. We also zap the
+        # exc_info attribute, as it's no longer needed and, if not None,
+        # will typically not be pickleable.
+        self.format(record)
+        record.msg = record.message
+        record.args = None
+        record.exc_info = None
+        return record
+
+    def emit(self, record):
+        """
+        Emit a record.
+
+        Writes the LogRecord to the queue, preparing it for pickling first.
+        """
+        try:
+            self.enqueue(self.prepare(record))
+        except Exception:
+            self.handleError(record)
                   
 if __name__ == '__main__':
     usage = "Usage:       python project_summary_upload_LIMS.py [options]"
@@ -216,10 +317,10 @@ if __name__ == '__main__':
                       " that will be used only if --no_upload tag is used"), default=None)
     parser.add_option("-m", "--multiprocs", type='int', dest = "processes", default = 4,
                       help = "How many processes will be spawned. Will only work with -a")
+    parser.add_option("-l", "--logfile", dest = "logfile", help = ("log file",
+                      " that will be used. default is $HOME/lims2db_projects.log "), default=os.path.expanduser("~/lims2db_projects.log"))
 
     (options, args) = parser.parse_args()
-    LOG = scilifelab.log.file_logger('LOG', options.conf, 'lims2db_projects.log'
-                                                               ,'log_dir_tools')
  
     main(options)
 

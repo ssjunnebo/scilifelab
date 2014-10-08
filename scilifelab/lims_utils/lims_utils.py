@@ -14,6 +14,7 @@ In the lims_utils context, processes are categorised into groups that define,
 or are used to define a certain type of statusdb key. The categories and their 
 processes are defined here:""" 'hh'
 
+
 INITALQCFINISHEDLIB = {'24' : 'Customer Gel QC',
     '62' : 'qPCR QC (Library Validation) 4.0',
     '64' : 'Quant-iT QC (Library Validation) 4.0',
@@ -88,7 +89,6 @@ SAMP_UDF_EXCEPTIONS = ['customer_name','reads_requested_(millions)','min_reads',
     'm_reads','dup_rm','status_auto','status_manual','average_size_bp','incoming_qc_status']
 
 CALIPER={'20' : 'CaliperGX QC (DNA)','116' : 'CaliperGX QC (RNA)'}
-
 
 def procHistory(proc, samplename):
     """Quick wat to get the ids of parent processes from the given process, 
