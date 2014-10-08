@@ -118,7 +118,7 @@ class ProjectDB():
         if len(project_summary) > 0:
             self.obj['project_summary'] = udf_dict(project_summary[0])
         if len(project_summary) > 1:
-            logging.info('Warning. project summary process run more than once')
+            logging.warn('Warning. project summary process run more than once')
 
     def _get_sequencing_finished(self):
         """Finish Date = last seq date if proj closed. Will be removed and 
@@ -332,7 +332,11 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            try:
+                                dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            except:
+                                print "ERROR"
+                                print arts[1].id
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
