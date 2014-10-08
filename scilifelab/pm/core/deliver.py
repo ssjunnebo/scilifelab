@@ -592,7 +592,7 @@ class BestPracticeReportController(AbstractBaseController):
             p_con = ProjectSummaryConnection(dbname=self.app.config.get("db", "projects"), **vars(self.app.pargs))
             s_con = SampleRunMetricsConnection(dbname=self.app.config.get("db", "samples"), **vars(self.app.pargs))
             try:
-                sample_name_map = get_scilife_to_customer_name(self.pargs.statusdb_project_name, p_con, s_con)
+                sample_name_map = get_scilife_to_customer_name(self.pargs.statusdb_project_name, p_con, s_con, get_barcode_seq=True)
             except ValueError as e:
                 self.log.warn(str(e))
                 self.log.warn("No such project {} defined in statusdb; try using option --statusdb_project_name".format(self.app.pargs.project))

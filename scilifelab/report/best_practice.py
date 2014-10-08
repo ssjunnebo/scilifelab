@@ -80,7 +80,7 @@ def _dataframe_to_texttable(df, align=None):
     ttab.set_cols_width(colWidths)
     # Note: this does not affect the final pdf output
     ttab.set_cols_align(["r"] * len(colWidths))
-    return ttab    
+    return ttab
 
 def _indent_texttable_for_rst(ttab, indent=4, add_spacing=True):
     """Texttable needs to be indented for rst.
@@ -118,7 +118,7 @@ def _split_project_summary_sample_name(samplename):
     return info
 
 def _get_seqcap_summary(flist, amplicon=False):
-    """Gather relevant information for sequence capture.  
+    """Gather relevant information for sequence capture.
 
     If amplicon=true, make sure that hs_metrics results are *not* based on
     MarkDuplicate-marked bams. This is currently done by scanning for
@@ -139,7 +139,7 @@ def _get_seqcap_summary(flist, amplicon=False):
             if amplicon:
                 tmp_df = _update_project_summary_hs_metrics(run_info, tmp_df)
             df_list.append(tmp_df)
-            
+
     df = pd.concat(df_list)
     samples_list = [_split_project_summary_sample_name(x) for x in df["Sample"]]
     samples_df = pd.DataFrame([_split_project_summary_sample_name(x) for x in df["Sample"]])
@@ -214,7 +214,7 @@ def _get_database_table(flist, post_process=None):
     ret_df = ret_df[i]
     ret_df["Version"] = [os.path.basename(x) for x in ret_df["Version"]]
     return ret_df.sort(["Database"])
-    
+
 def _format_num_reads(reads):
     """Format number of reads as k, M, or G"""
     fmt_reads = []
@@ -226,7 +226,7 @@ def _format_num_reads(reads):
         else:
             fmt_reads.append("{:.1f}M".format(int(x)/1e6))
     return fmt_reads
-    
+
 
 def best_practice_note(project_name=None, samples=None, capture_kit="agilent_v4", application="seqcap", flist=[], sample_name_map=None, **kw):
     """Make a best practice application note.
@@ -247,6 +247,7 @@ def best_practice_note(project_name=None, samples=None, capture_kit="agilent_v4"
         database_df = _get_database_table(flist, post_process=kw.get("post_process", None))
         if sample_name_map:
             samples_df.CustomerName = [sample_name_map[s]['customer_name'] for s in samples_df.Sample]
+            samples_df.Sequence = [sample_name_map[s]['barcode_seq'] for s in samples_df.Sample]
         df.Total = _format_num_reads(df.Total)
         ttab = _indent_texttable_for_rst(_dataframe_to_texttable(df[["Sample"] + SEQCAP_TABLE_COLUMNS[1:5]], align=["left", "right", "right", "right", "right"]))
         ttab_target = _indent_texttable_for_rst(_dataframe_to_texttable(df[["Sample"] + SEQCAP_TABLE_COLUMNS[5:9]], align=["left", "right", "right", "right", "right"]))
