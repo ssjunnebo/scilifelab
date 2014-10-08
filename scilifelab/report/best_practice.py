@@ -246,8 +246,8 @@ def best_practice_note(project_name=None, samples=None, capture_kit="agilent_v4"
         software_df = _get_software_table(flist)
         database_df = _get_database_table(flist, post_process=kw.get("post_process", None))
         if sample_name_map:
-            samples_df.CustomerName = [sample_name_map[s]['customer_name'] for s in samples_df.Sample]
-            samples_df.Sequence = [sample_name_map[s]['barcode_seq'] for s in samples_df.Sample]
+            samples_df.CustomerName = [sample_name_map[s].get('customer_name',None) for s in samples_df.Sample]
+            samples_df.Sequence = [sample_name_map[s].get('barcode_seq',None) for s in samples_df.Sample]
         df.Total = _format_num_reads(df.Total)
         ttab = _indent_texttable_for_rst(_dataframe_to_texttable(df[["Sample"] + SEQCAP_TABLE_COLUMNS[1:5]], align=["left", "right", "right", "right", "right"]))
         ttab_target = _indent_texttable_for_rst(_dataframe_to_texttable(df[["Sample"] + SEQCAP_TABLE_COLUMNS[5:9]], align=["left", "right", "right", "right", "right"]))
