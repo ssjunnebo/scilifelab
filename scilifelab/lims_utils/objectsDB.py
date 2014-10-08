@@ -332,11 +332,7 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            try:
-                                dem_art = Artifact(lims, id = steps.latestdem['outart'])
-                            except:
-                                print "ERROR"
-                                print arts[1].id
+                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
