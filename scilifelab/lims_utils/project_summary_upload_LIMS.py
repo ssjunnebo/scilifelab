@@ -201,7 +201,7 @@ def masterProcess(options,projectList, mainlims, logger):
     childs=[]
     #Initial step : order projects by sample number:
     logger.info("ordering the project list")
-    orderedprojectlist=sorted(projectList, key=lambda x: (mainlims.get_sample_number(x.name)), reverse=True)
+    orderedprojectlist=sorted(projectList, key=lambda x: (mainlims.get_sample_number(projectname=x.name)), reverse=True)
     logger.info("done ordering the project list")
     #spawn a pool of processes, and pass them queue instance 
     for i in range(options.processes):
