@@ -16,7 +16,7 @@ from pprint import pprint
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
 import objectsDB as DB
-from datetime import date
+import datetime
 import time
 import multiprocessing as mp
 import Queue
@@ -65,8 +65,8 @@ class PSUL():
         """Project registered as closed?"""
 
         if self.close_date:
-            closed = date(*map(int, self.close_date.split('-')))
-            return (date.today() - closed).days
+            closed=datetime.datetime.strptime(self.close_date,"%Y-%m-%d" )
+            return (datetime.datetime.today() - closed).days
         else:
             return 0
 
@@ -303,7 +303,7 @@ if __name__ == '__main__':
     parser.add_option("-a", "--all_projects", dest = "all_projects", action = 
                       "store_true", default = False, help = ("Upload all Lims ",
                       "projects into couchDB. Don't use with -f flagg."))
-    parser.add_option("-d", "--days", dest = "days", default = 60, help = (
+    parser.add_option("-d", "--days",type='int', dest = "days", default = 60, help = (
                       "Projects with a close_date older than DAYS days are not",
                       " updated. Default is 60 days. Use with -a flagg"))
     parser.add_option("-c", "--conf", dest = "conf", default = os.path.join(
