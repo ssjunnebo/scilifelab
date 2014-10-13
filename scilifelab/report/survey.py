@@ -147,7 +147,7 @@ def initiate_survey(report, project, **kw):
     # verify the format of the email address
     recipients = []
     for email in emails:
-        if email is None or not re.match(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$',email):
+        if email is None or not re.match(r'[^@]+@[^@]+\.[^@]+', email):
             report.log.warn("Illegal email format: {}".format(email))
             continue
         recipients.append(email)
