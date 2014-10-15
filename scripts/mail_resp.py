@@ -31,7 +31,8 @@ email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
         u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se'
         }
-project_types=['Illumina Sequencing (Illumina SBS) 4.0', 'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
+project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
+'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
 
 def clean_names(name):
     return name.replace(u"\u00f6", "o").replace(u"\u00e9", "e").replace(u"\u00e4", "a")
@@ -106,9 +107,8 @@ for resp in summary:
         elif struct['sum']:
             plist.add(struct['project'])
             body+='Project {} {} on {} by {}\n'.format(struct['project'], struct['action'],struct['date'],struct['techID'])
-    #print "TO " +email[resp]
-    #print " ".join(plist)
-    #print body
+    body+='\n\n--\nThis mail is an automated mail that is generated once a day and summarizes the events of the previous days in the lims, \
+for the projects you are described as "Lab responsible" or "Bioinfo Responsible". You can send comments or suggestions to denis.moreno@scilifelab.se.'
     if body!= '':
         msg=MIMEText(body)
         msg['Subject']='[Lims update] {}'.format(" ".join(plist))
