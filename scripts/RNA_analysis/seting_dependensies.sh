@@ -22,6 +22,7 @@ gtf_file=$7
 WP=$8
 mail=$9
 single=${10}
+order_num=${11}
 name_list=(`echo $names | tr "," "\n"`)
 
 cd $path
@@ -48,7 +49,7 @@ for i in ${name_list[*]};do
     DEP_REPORT=$DEP_REPORT:$JOB
     echo 'complexity'
     ## lib complexity
-    make_complexity_plots.py ${i} $mail $config_file $path
+    make_complexity_plots.py ${i} $mail $config_file $path $order_num
     JOBID=`sbatch complexity_${i}.sh| sed -re 's/.+\s+([0-9]+)/\1/'`
     DEPENDENCY=$DEPENDENCY:$JOBID
 done
