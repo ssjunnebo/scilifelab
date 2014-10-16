@@ -18,6 +18,7 @@ from scilifelab.bcbio import prune_pp_platform_args
 from scilifelab.bcbio.flowcell import Flowcell
 from scilifelab.bcbio.status import status_query
 from scilifelab.utils.string import strip_extensions
+from scilifelab.utils.misc import get_path_swestore_staging
 from scilifelab.pm.core.bcbio import BcbioRunController
 from scilifelab.utils.timestamp import utc_time
 from scilifelab.db.statusdb import FlowcellRunMetricsConnection
@@ -307,16 +308,17 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
             old_runs = []
             for d in dirs:
                 nosync_dir = os.path.join(d, 'nosync')
-                for fc in glob.glob(os.path.join(nosync_dir, '1*')):
-                    fc_name = os.path.basename(fc)
-                    #Check that there is no check file indicating to not remove the run
-                    if not os.path.exists(os.path.join(fc, 'no_remove.txt')):
-                        stats = os.stat(os.path.join(fc, 'RTAComplete.txt'))
-                        mod_time = datetime.now() - datetime.fromtimestamp(stats.st_mtime)
-                        if mod_time.days >= 30:
-                            old_runs.append(fc)
-                    else:
-                        self.app.log.warn("no_remove.txt file found in {}, skipping run".format(fc_name))
+                for fc in glob.iglob(os.path.join(nosync_dir, '1*')):
+                    if os.path.isdir(fc):
+                        fc_name = os.path.basename(fc)
+                        #Check that there is no check file indicating to not remove the run
+                        if not os.path.exists(os.path.join(fc, 'no_remove.txt')):
+                            stats = os.stat(os.path.join(fc, 'RTAComplete.txt'))
+                            mod_time = datetime.now() - datetime.fromtimestamp(stats.st_mtime)
+                            if mod_time.days >= 30:
+                                old_runs.append(fc)
+                        else:
+                            self.app.log.warn("no_remove.txt file found in {}, skipping run".format(fc_name))
 
             #NAS servers
             if 'nas' in server:
@@ -399,7 +401,9 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
     def sync_run(self):
         storage_conf = self.app.config.get_section_dict('storage')
         archive_conf = self.app.config.get_section_dict('archive')
-        swestore_dir = self.app.config.get_section_dict('archive').get('swestore_staging')
+        swestore_paths = set(self.app.config.get_section_dict('archive').get('swestore_staging').split(','))
+        run = self.pargs.tarball if self.pargs.tarball else self.pargs.flowcell
+        swestore_dir = get_path_swestore_staging(run, swestore_dir)
         servers = [server for server in storage_conf.keys()]
         server = platform.node().split('.')[0].lower()
         flowcell = self.pargs.flowcell
@@ -421,7 +425,7 @@ class ProductionController(AbstractExtendedBaseController, BcbioRunController):
                   run_dir,
                   '{}@{}:{}'.format(archive_conf.get('user'),
                                     archive_conf.get('server'),
-                                    archive_conf.get('swestore_staging'))]
+                                    swestore_dir)]
             try:
                 subprocess.check_call(cl)
             except subprocess.CalledProcessError():

@@ -249,3 +249,16 @@ def merge(d1, d2):
         else:
             d1[key] = d2[key]
     return d1
+
+def get_path_swestore_staging(run, staging_dirs):
+    """ Get the swestore_staging directory containing a run
+
+    :param: run: String - run to find
+    :param: staging_dirs: Set - Set of staging directories
+    :returns: path: String - swestore_staging directory that contains the run
+    """
+    for d in staging_dirs:
+        p = os.path.join(d, run)
+        if os.path.exists(p):
+            return d
+

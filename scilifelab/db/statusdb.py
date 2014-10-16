@@ -316,23 +316,26 @@ def get_qc_data(sample_prj, p_con, s_con, fc_id=None):
             qcdata[s["name"]]["PERCENT_ON_TARGET"] = float(qcdata[s["name"]]["FOLD_ENRICHMENT"]/ (float(qcdata[s["name"]]["GENOME_SIZE"]) / float(target_territory))) * 100
     return qcdata
 
-def get_scilife_to_customer_name(project_name, p_con, s_con):
-    """Get scilife to customer name mapping, represented as a
+def get_scilife_to_customer_name(project_name, p_con, s_con, get_barcode_seq=False):
+    """Get scilife to customer name mapping optionally with barcodes, represented as a
     dictionary.
 
     :param project_name: project name
     :param p_con: object of type <ProjectSummaryConnection>
     :param s_con: object of type <SampleRunMetricsConnection>
+    :param get_barcode_seq: True/False(default)
 
-    :returns: dictionary with keys scilife name and values customer name
+    :returns: dictionary with keys scilife name and values customer name and barcodes(optional)
     """
-    barcode_names = [s.get("barcode_name", None) for s in s_con.get_samples(sample_prj=project_name)]
     name_d = {}
-    for bcname in barcode_names:
+    for samp in s_con.get_samples(sample_prj=project_name):
+        bcname = samp.get("barcode_name", None)
         s = p_con.get_project_sample(project_name, bcname)
         name_d[bcname] = {'scilife_name': s['project_sample'].get('scilife_name', bcname),
                           'customer_name' : s['project_sample'].get('customer_name', None)
                           }
+        if get_barcode_seq:
+            name_d[bcname]["barcode_seq"] = samp.get("sequence", None)
     return name_d
 
 
@@ -549,18 +552,12 @@ class ProjectSummaryConnection(Couch):
 
         :returns: ordered amount of reads if present, None otherwise
         """
-        source = self.get_info_source(project_name)
-        if source == 'lims' and samples:
-            #Get the first project sample and extract the reads_requested_(millions)
-            sample_id, details = samples.items()[0]
-            amount = details.get('reads_requested_(millions)', None)
-        else:
+        try:
+            amount = samples.values()[0]["details"]["reads_min"]
+        except (TypeError, KeyError):
             amount = self.get_entry(project_name, 'min_m_reads_per_sample_ordered')
-        self.log.debug("got amount {}".format(amount))
-        if not amount:
-            return None
-        else:
-            return round(amount, dec)
+        finally:
+            return amount
 
     def get_latest_library_prep(self, project_name):
         """Get mapping from project name to sample_run_metrics for

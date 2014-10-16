@@ -446,10 +446,16 @@ def _set_sample_table_values(sample_name, project_sample, barcode_seq, ordered_m
 
     :returns: vals, a dictionary of table values
     """
-    prjs_to_table = {'ScilifeID':'scilife_name', 'SubmittedID':'customer_name', 'MSequenced':'m_reads_sequenced'}#, 'MOrdered':'min_m_reads_per_sample_ordered', 'Status':'status'}
-    vals = {x:project_sample.get(prjs_to_table[x], None) for x in prjs_to_table.keys()}
-    # Set status
-    vals['Status'] = project_sample.get("status", "N/A")
+    vals = {}
+    vals['ScilifeID'] = project_sample.get("scilife_name", None)
+    vals['SubmittedID'] = project_sample.get("customer_name", None)
+    details = project_sample.get("details", None)
+    try:
+        vals['MSequenced'] = details["total_reads_(m)"]
+    except (TypeError, KeyError):
+        #KeyError : no such key, TypeError: details is None
+        vals['MSequenced'] = project_sample.get("m_reads_sequenced")
+
     if ordered_million_reads:
         param["ordered_amount"] = _get_ordered_million_reads(sample_name, ordered_million_reads)
     vals['MOrdered'] = param["ordered_amount"]
@@ -558,7 +564,7 @@ def project_status_note(project_name=None, username=None, password=None, url=Non
     # parameters
     parameters = {
         "project_name" : project_name,
-        "finished" : "Not finished, or cannot yet assess if finished.",
+        "finished" : "",
         }
 
     output_data, sample_table, param = _project_status_note_table(project_name, username, password, url,
@@ -573,6 +579,10 @@ def project_status_note(project_name=None, username=None, password=None, url=Non
         # Set report paragraphs
         paragraphs = project_note_paragraphs()
         headers = project_note_headers()
+
+        #Hack: removes Comments paragraph if it is empty
+        if not param["finished"]:
+            paragraphs.pop("Comments",None)
 
         paragraphs["Samples"]["tpl"] = make_sample_table(sample_table)
         make_note("{}_project_summary.pdf".format(project_name), headers, paragraphs, **param)
@@ -608,7 +618,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     # mapping project_summary to parameter keys
     ps_to_parameter = {"scilife_name":"scilife_name", "customer_name":"customer_name", "project_name":"project_name"}
     # mapping project sample to table
-    table_keys = ['ScilifeID', 'SubmittedID', 'BarcodeSeq', 'MSequenced', 'MOrdered', 'Status']
+    table_keys = ['ScilifeID', 'SubmittedID', 'BarcodeSeq', 'MSequenced', 'MOrdered']
 
     output_data = {'stdout':StringIO(), 'stderr':StringIO(), 'debug':StringIO()}
     # Connect and run
@@ -626,6 +636,12 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
         LOG.warn("No such project '{}'".format(project_name))
         return
     LOG.debug("Working on project '{}'.".format(project_name))
+
+    # Determine if project is finished by getting all samples sequenced date
+    try:
+        all_samples_sequenced = prj_summary['project_summary']['all_samples_sequenced']
+    except (TypeError,KeyError):
+        all_samples_sequenced = False
 
     # Get sample run list and loop samples to make mapping sample -> {sampleruns}
     sample_run_list = _set_sample_run_list(project_name, flowcell=None, project_alias=project_alias, s_con=s_con)
@@ -650,7 +666,12 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     sample_dict = prj_summary['samples']
     param.update({key:prj_summary.get(ps_to_parameter[key], None) for key in ps_to_parameter.keys()})
     param["ordered_amount"] = param.get("ordered_amount", p_con.get_ordered_amount(project_name, samples=sample_dict))
-    param['customer_reference'] = param.get('customer_reference', prj_summary.get('customer_reference'))
+
+    if not param.get('customer_reference') :
+        try:
+            param['customer_reference'] = prj_summary['details']['customer_project_reference']
+        except (TypeError,KeyError):
+            param['customer_reference'] = prj_summary.get('customer_reference')
     param['uppnex_project_id'] = param.get('uppnex_project_id', prj_summary.get('uppnex_id'))
 
     # Override database values if options passed at command line
@@ -666,7 +687,6 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     ## Start collecting the data
     sample_table = []
     samples_excluded = []
-    all_passed = True
     last_library_preps = p_con.get_latest_library_prep(project_name)
     last_library_preps_srm = [x for l in last_library_preps.values() for x in l]
     LOG.debug("Looping through sample map that maps project sample names to sample run metrics ids")
@@ -692,7 +712,6 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
         # Get the project sample name from the sample run and set table values
         project_sample = sample_dict[v['sample']]
         vals = _set_sample_table_values(v['sample'], project_sample, barcode_seq, ordered_million_reads, param)
-        if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
         sample_table.append([vals[k] for k in table_keys])
 
     # Loop through samples in sample_dict for which there is no sample run information
@@ -708,17 +727,15 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
             for k,v in project_sample_d.iteritems():
                 barcode_seq = s_con.get_entry(k, "sequence")
                 vals = _set_sample_table_values(sample, project_sample, barcode_seq, ordered_million_reads, param)
-                if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
                 sample_table.append([vals[k] for k in table_keys])
         else:
             barcode_seq = None
             vals = _set_sample_table_values(sample, project_sample, barcode_seq, ordered_million_reads, param)
-            if vals['Status']=="N/A" or vals['Status']=="NP": all_passed = False
             sample_table.append([vals[k] for k in table_keys])
-    if all_passed: param["finished"] = 'Project finished.'
+    if all_samples_sequenced: param["finished"] = 'All samples for this project have been sequenced.'
     sample_table.sort()
     sample_table = list(sample_table for sample_table,_ in itertools.groupby(sample_table))
-    sample_table.insert(0, ['ScilifeID', 'SubmittedID', 'BarcodeSeq', 'MSequenced', 'MOrdered', 'Status'])
+    sample_table.insert(0, ['ScilifeID', 'SubmittedID', 'BarcodeSeq', 'MSequenced', 'MOrdered'])
 
     return output_data, sample_table, param
 
