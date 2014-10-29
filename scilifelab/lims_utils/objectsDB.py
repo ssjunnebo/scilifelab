@@ -116,7 +116,7 @@ class ProjectDB():
         if len(project_summary) > 0:
             self.obj['project_summary'] = udf_dict(project_summary[0])
         if len(project_summary) > 1:
-            print 'Warning. project summary process run more than once'
+            logging.warn('Warning. project summary process run more than once')
 
     def _get_sequencing_finished(self):
         """Finish Date = last seq date if proj closed. Will be removed and 

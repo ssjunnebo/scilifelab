@@ -579,7 +579,7 @@ class BestPracticeReportController(AbstractBaseController):
         if not self._check_pargs(["project"]):
             return
         if not self.pargs.statusdb_project_name:
-            self.statusdb_project_name = self.pargs.project
+            self.pargs.statusdb_project_name = self.pargs.project
         kw = vars(self.pargs)
         basedir = os.path.abspath(os.path.join(self.app.controller._meta.root_path, self.app.controller._meta.path_id))
         flist = find_samples(basedir, **vars(self.pargs))
@@ -592,7 +592,7 @@ class BestPracticeReportController(AbstractBaseController):
             p_con = ProjectSummaryConnection(dbname=self.app.config.get("db", "projects"), **vars(self.app.pargs))
             s_con = SampleRunMetricsConnection(dbname=self.app.config.get("db", "samples"), **vars(self.app.pargs))
             try:
-                sample_name_map = get_scilife_to_customer_name(self.pargs.statusdb_project_name, p_con, s_con)
+                sample_name_map = get_scilife_to_customer_name(self.pargs.statusdb_project_name, p_con, s_con, get_barcode_seq=True)
             except ValueError as e:
                 self.log.warn(str(e))
                 self.log.warn("No such project {} defined in statusdb; try using option --statusdb_project_name".format(self.app.pargs.project))
