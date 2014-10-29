@@ -6,8 +6,6 @@ statusdb with lims as the main source of information.
 Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 """
 import codecs
-from scilifelab.google import _to_unicode, _from_unicode
-from pprint import pprint
 from genologics.lims import *
 import genologics.entities as gent
 from lims_utils import *
