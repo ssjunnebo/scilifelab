@@ -20,7 +20,7 @@ def main(stat_file, single, min, proj):
         else:
             qc_passed = False
         print "{0}  : {1} : {2} : {3}".format(key, qc_passed ,
-                                             str(M_reads_aft_dup_rem), str(min))
+                           str(M_reads_aft_dup_rem), str(min_reads_aft_dup_rem))
         qc_dict[key] = {"automated_qc": {
                                 "qc_passed": qc_passed,
                                 "qc_reason": "M reads after duplicates removed: {0}. Minimal amount after duplicates removed: {1}".format(str(M_reads_aft_dup_rem), min_reads_aft_dup_rem)}}
