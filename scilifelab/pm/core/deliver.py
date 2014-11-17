@@ -359,6 +359,10 @@ class DeliveryController(AbstractBaseController):
         kw = vars(self.pargs)
         basedir = os.path.abspath(os.path.join(self._meta.root_path, self._meta.path_id))
         flist = find_samples(basedir, **vars(self.pargs))
+        if self.pargs.flowcell:
+            flist = [ fl for fl in flist if os.path.basename(os.path.dirname(fl)) == self.pargs.flowcell ]
+        if self.pargs.sample:
+            flist = [ fl for fl in flist if os.path.basename(fl).split('-')[0] == self.pargs.sample ]
         if not len(flist) > 0:
             self.log.info("No samples/sample configuration files found")
             return
