@@ -358,7 +358,7 @@ class DeliveryController(AbstractBaseController):
             self.app.cmd.safe_makedir(outpath)
         kw = vars(self.pargs)
         basedir = os.path.abspath(os.path.join(self._meta.root_path, self._meta.path_id))
-        flist = find_samples(basedir, sample=self.pargs.sample, **vars(self.pargs))
+        flist = find_samples(basedir, **vars(self.pargs))
         if self.pargs.flowcell:
             flist = [ fl for fl in flist if os.path.basename(os.path.dirname(fl)) == self.pargs.flowcell ]
         if not len(flist) > 0:
