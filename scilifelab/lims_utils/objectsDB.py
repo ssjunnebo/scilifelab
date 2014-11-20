@@ -13,7 +13,6 @@ from scilifelab.db.statusDB_utils import *
 from helpers import *
 import os
 import couchdb
-import bcbio.pipeline.config_utils as cl
 import time
 from datetime import date
 import logging
@@ -88,6 +87,21 @@ class ProjectDB():
         self._get_project_level_info()
         self._make_DB_samples()
         self._get_sequencing_finished()
+        self._get_open_escalations()
+
+    def _get_open_escalations(self):
+        escalation_ids=[]
+        processes=self.lims.get_processes(projectname=self.project.name)
+        for p in processes:
+            step=gent.Step(self.lims, id=p.id)
+            if step.actions.escalation:
+                samples_escalated=set()
+                if step.actions.escalation['status'] == "Pending":
+                    shortid=step.id.split("-")[1]
+                    escalation_ids.append(shortid)
+        if escalation_ids:
+            self.obj['escalations']=escalation_ids
+
 
     def _get_project_level_info(self):
         self.obj = {'source' : 'lims',
