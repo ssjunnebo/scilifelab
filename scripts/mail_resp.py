@@ -29,6 +29,7 @@ email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Jun Wang':'jun.wang@scilifelab.se',
         u'Bahram Amini':'bahram.amini@scilifelab.se',
         u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
+        u'Simone Picelli':'simone.picelli@scilifelab.se',
         u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se'
         }
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
@@ -115,6 +116,5 @@ for the projects you are described as "Lab responsible" or "Bioinfo Responsible"
         msg['From']='Lims_monitor'
         msg['To'] =email[resp]
         s = smtplib.SMTP('smtp.ki.se')
-        print msg
-        #s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
+        s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
         s.quit()
