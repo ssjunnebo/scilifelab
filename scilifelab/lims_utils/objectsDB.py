@@ -736,8 +736,8 @@ class Prep():
             if library_validation.has_key("size_(bp)"):
                 average_size_bp = library_validation.pop("size_(bp)")
                 library_validation["average_size_bp"] = average_size_bp
-            if latest_caliper_id:
+            if latest_caliper_id and (Process(lims, id=latest_caliper_id['id'])).date_run >= (Process(lims, id=libvalstart['id']).date_run):
                 library_validation["caliper_image"] = get_caliper_img(self.sample_name,
-                                                            latest_caliper_id['id'])
+                                                        latest_caliper_id['id'])
             library_validations[agrlibQCstep['id']] = delete_Nones(library_validation)
         return delete_Nones(library_validations) 
