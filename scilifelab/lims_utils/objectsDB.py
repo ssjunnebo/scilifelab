@@ -10,65 +10,12 @@ from genologics.lims import *
 import genologics.entities as gent
 from lims_utils import *
 from scilifelab.db.statusDB_utils import *
-from helpers import *
+from functions import *
 import os
 import couchdb
 import time
 from datetime import date
 import logging
-
-###  Functions ###
-
-def udf_dict(element, exeptions = [], exclude = True):
-    """Takes a lims element and tertuns a dictionary of its udfs, where the udf 
-    names are trensformed to statusdb keys (underscore and lowercase).
-    
-    exeptions and exclude = False - will return a dict with only the exeptions
-    exeptions and exclude = True - will return a dict without the exeptions  
-
-    Arguments:
-        element     lims element (Sample, Artifact, Process, Project...)
-        exeptions   list of exception udf keys (underscore and lowercase)
-        exlude      (True/False)"""
-
-    udf_dict = {}
-    for key, val in element.udf.items():
-        key = key.replace(' ', '_').lower().replace('.','')
-        try: val = val.isoformat()
-        except: pass
-        if key in exeptions and not exclude:
-            udf_dict[key] = val
-        elif key not in exeptions and exclude:
-            udf_dict[key] = val
-    return udf_dict
-
-def get_last_first(process_list, last=True):
-    returned_process=None
-    for pro in process_list:
-        if (not returned_process) \
-        or (pro.get('date')>returned_process.get('date') and last) \
-        or (pro.get('date')<returned_process.get('date') and not last):
-            returned_process= pro
-    return returned_process
-
-def get_caliper_img(sample_name, caliper_id):
-    caliper_image = None
-    try:
-        last_caliper = Process(lims,id = caliper_id)
-        outarts = last_caliper.all_outputs()
-        for out in outarts:
-            s_names = [p.name for p in out.samples]
-            if (sample_name in s_names and out.type == "ResultFile"):
-                files = out.files
-                for f in files:
-                    if ".png" in f.content_location:
-                        caliper_image = f.content_location
-    except TypeError:
-        #Should happen when no caliper processes are found
-        pass
-    return caliper_image
-
-### Classes  ###
 
 class ProjectDB():
     """Instances of this class holds a dictionary formatted for building up the 
@@ -537,7 +484,7 @@ class InitialQC():
             if self.steps.latestCaliper:
                 self.initialqc_info['caliper_image'] = get_caliper_img(
                                                                self.sample_name,
-                                                 self.steps.latestCaliper['id'])
+                                           self.steps.latestCaliper['id'], lims)
         return delete_Nones(self.initialqc_info)
 
 
@@ -738,6 +685,6 @@ class Prep():
                 library_validation["average_size_bp"] = average_size_bp
             if latest_caliper_id and (Process(lims, id=latest_caliper_id['id'])).date_run >= (Process(lims, id=libvalstart['id']).date_run):
                 library_validation["caliper_image"] = get_caliper_img(self.sample_name,
-                                                        latest_caliper_id['id'])
+                                                        latest_caliper_id['id'], lims)
             library_validations[agrlibQCstep['id']] = delete_Nones(library_validation)
         return delete_Nones(library_validations) 

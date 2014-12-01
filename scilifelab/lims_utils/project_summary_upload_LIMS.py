@@ -11,7 +11,7 @@ import codecs
 from optparse import OptionParser
 import load_status_from_google_docs 
 from scilifelab.db.statusDB_utils import *
-from helpers import *
+from functions import *
 from pprint import pprint
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
@@ -103,7 +103,8 @@ class PSUL():
     def update_project(self, database):
         """Fetch project info and update project in the database."""
         opended_after_140630 = comp_dates('2014-06-30', self.ordered_opened)
-        try:
+#        try:
+        if 1==1:
             self.log.info('Handeling {proj}'.format(proj = self.name))
             project = database.ProjectDB(self.lims, self.id, self.samp_db)
             key = find_proj_from_view(self.proj_db, self.name)
@@ -119,9 +120,9 @@ class PSUL():
                 info = self.print_couchdb_obj_to_file(project.obj)
             return "project {name} is handled and {info}: _id = {id}".format(
                                name=self.name, info=info, id=project.obj['_id'])
-        except:
-            return ('Issues geting info for {name}. The "Application" udf might'
-                                         ' be missing'.format(name = self.name))
+#        except:
+#            return ('Issues geting info for {name}. The "Application" udf might'
+        #                                 ' be missing'.format(name = self.name))
 
     def project_update_and_logging(self):
         start_time = time.time()
