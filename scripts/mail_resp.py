@@ -13,6 +13,7 @@ sixMonthsAgo=date.today()-timedelta(weeks=26);
 yesterday=date.today()-timedelta(days=1)
 pjs=lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
 
+operator="denis.moreno@scilifelab.se"
 summary={}
 email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Chuan Wang':'chuan.wang@scilifelab.se',
@@ -30,6 +31,7 @@ email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Bahram Amini':'bahram.amini@scilifelab.se',
         u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
         u'Simone Picelli':'simone.picelli@scilifelab.se',
+        u'Lina Sylwan':'lina.sylwan@scilifelab.se',
         u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se'
         }
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
@@ -114,7 +116,12 @@ for the projects you are described as "Lab responsible" or "Bioinfo Responsible"
         msg=MIMEText(body)
         msg['Subject']='[Lims update] {}'.format(" ".join(plist))
         msg['From']='Lims_monitor'
-        msg['To'] =email[resp]
+        try:
+            msg['To'] =email[resp]
+        except KeyError:
+            msg['To'] = operator
+            msg['Subject']='[Lims update] Failed to send a mail to {}'.format(resp)
+
         s = smtplib.SMTP('smtp.ki.se')
         s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
         s.quit()
