@@ -11,7 +11,7 @@ import codecs
 from optparse import OptionParser
 import load_status_from_google_docs 
 from scilifelab.db.statusDB_utils import *
-from helpers import *
+from functions import *
 from pprint import pprint
 from genologics.lims import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
