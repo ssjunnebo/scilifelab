@@ -294,8 +294,9 @@ class SampleDB():
                             try:
                                 dem_art = Artifact(lims, id = steps.latestdem['outart'])
                                 dem_qc=dem_art.qc_flag
-                            except AssertionError:
+                            except ValueError:
                                 #Miseq projects might not have a demultiplexing step here
+                                #so the artifact id might be None
                                 dem_qc=None
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
