@@ -8,7 +8,8 @@ Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 import codecs
 from genologics.lims import *
 import genologics.entities as gent
-from lims_utils import *
+from genologics.lims_utils import *
+from process_categories import *
 from scilifelab.db.statusDB_utils import *
 from functions import *
 import os

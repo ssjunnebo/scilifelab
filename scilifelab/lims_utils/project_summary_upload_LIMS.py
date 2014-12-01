@@ -95,7 +95,6 @@ class PSUL():
                                  '({ord_op})'.format(ord_op = self.ordered_opened))
         else:
             start_update = True
-
         if start_update:
             log_info = self.update_project(DB)
         return log_info
@@ -137,17 +136,17 @@ class PSUL():
         self.log.info(log_info) 
 
 def main(options):
-    man_name=options.project_name
-    all_projects=options.all_projects
-    days=options.days
-    conf=options.conf
-    upload_data=options.upload
+    man_name = options.project_name
+    all_projects = options.all_projects
+    days = options.days
+    conf = options.conf
+    upload_data = options.upload
     output_f = options.output_f
     couch = load_couch_server(conf)
     proj_db = couch['projects']
     samp_db = couch['samples']
     mainlims = Lims(BASEURI, USERNAME, PASSWORD)
-    mainlog=logging.getLogger('psullogger')
+    mainlog = logging.getLogger('psullogger')
     mainlog.setLevel(level=logging.INFO)
     mfh = logging.FileHandler(options.logfile)
     mft = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -321,6 +320,5 @@ if __name__ == '__main__':
                       " that will be used. default is $HOME/lims2db_projects.log "), default=os.path.expanduser("~/lims2db_projects.log"))
 
     (options, args) = parser.parse_args()
- 
     main(options)
 
