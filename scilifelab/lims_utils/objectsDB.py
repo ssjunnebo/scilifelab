@@ -291,7 +291,12 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            try:
+                                dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                                dem_qc=dem_art.qc_flag
+                            except AssertionError:
+                                #Miseq projects might not have a demultiplexing step here
+                                dem_qc=None
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
@@ -308,7 +313,7 @@ class SampleDB():
                                     'sequencing_start_date' : ssd,
                                     'sequencing_run_QC_finished' : run['start_date'],
                                     'sequencing_finish_date' : sfd,
-                                    'dem_qc_flag' : dem_art.qc_flag,
+                                    'dem_qc_flag' : dem_qc,
                                     'seq_qc_flag' : seq_art.qc_flag}
                                 d = delete_Nones(d)
                                 if not sample_runs.has_key(key):
