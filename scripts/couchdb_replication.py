@@ -8,11 +8,10 @@ import sys
 import os
 import ConfigParser
 
-from scilifelab.log import minimal_logger
 from couchdb import PreconditionFailed
 
 #Set up logging
-l = minimal_logger("CouchDB replicator")
+l = logbook.Logger('CouchDB-Replicator')
 
 class Config(object):
     """Singleton class that holds the confiuration for the CouchDB replicator.
@@ -54,7 +53,7 @@ class Config(object):
                 self.roles['admins'] = config.get('roles', 'admins').split(',')
 
 
-def _get_databases_info(source, destination):
+def _get_databases_info(source, destination, skip):
     """Returns a tuple containing a python representation of source and destination
     couchDB instances. It also returns a list of the databases in both instances
     (excluding the _replicator database).
@@ -67,12 +66,17 @@ def _get_databases_info(source, destination):
     l.info("Databases in the source CouchDB instance: {}".format(', '.join(s_dbs)))
     l.info("Databases in the destination CouchDB instance: {}".format(', '.join(d_dbs)))
 
-    #We don't want to replicate the replicator DB
-    try:
-        s_dbs.remove('_replicator')
-        d_dbs.remove('_replicator')
-    except ValueError:
-        pass
+    #We don't want to replicate the replicator DB, and want to skip the databases in skip list
+    skip.append('_replicator')
+    for db in skip:
+        try:
+            s_dbs.remove(db) 
+        except ValueError:
+            pass
+        try:
+            d_dbs.remove(db)
+        except ValueError:
+            pass
 
     return s_couch, d_couch, s_dbs, d_dbs
 
@@ -111,13 +115,13 @@ def _setup_continuous(source, destination, copy_security):
     l.info("DONE!")
 
 
-def _clone(source, destination, copy_security, with_exceptions=False):
+def _clone(source, destination, copy_security, with_exceptions=False, skip=[]):
     """Creates a complete clone of source in destination.
 
     WARNING: This action will remove ALL content from destination.
     """
     l.info("Performing a complete clone from source to destination")
-    s_couch, d_couch, s_dbs, d_dbs = _get_databases_info(source, destination)
+    s_couch, d_couch, s_dbs, d_dbs = _get_databases_info(source, destination, skip)
     config = Config()
 
     #Delete all databases in destination
@@ -211,6 +215,9 @@ if __name__ == "__main__":
     parser.add_argument('--set-roles', action='store_const', const=True, \
             help='List of roles to apply to  each database after copied. Only if' \
             '--no-security is present.')
+    parser.add_argument('--skip', nargs="+", type=str,
+            help=('List of databases to skip during the replication. '
+                  'They will remain intact in the destination database'))
 
     args = parser.parse_args()
     source = args.source
@@ -232,7 +239,7 @@ if __name__ == "__main__":
     if action == "continuous":
         _setup_continuous(source, destination, copy_security)
     else:
-        _clone(source, destination, copy_security, with_exceptions=args.with_exceptions)
+        _clone(source, destination, copy_security, with_exceptions=args.with_exceptions, skip=args.skip)
         if args.set_roles:
             if not args.no_security:
                 l.warn('--set-roles option only takes effect if applied together ' \

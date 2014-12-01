@@ -1,16 +1,17 @@
 import sys
 from bcbio.pipeline.config_loader import load_config
-if len(sys.argv) < 5:
+if len(sys.argv) < 6:
     print """
 Usage:
 
-make_complexity_plots.py  <sample_name> <mail> <config_file> <path>
+make_complexity_plots.py  <sample_name> <mail> <config_file> <path> <order_num>
 
         sample_name		This name: /tophat_out_<sample name>
         mail                  	eg: jun.wang@scilifelab.se
         config_file           	post_process.yaml assumes that you have specified samtools
                                 version under 'custom_algorithms'/'RNA-seq analysis'
         path                  	Path to analysis dir containing the tophat_out_ directories
+        order_num               Millions of ordered number of reads 
         """
     sys.exit()
 
@@ -18,6 +19,8 @@ name            = sys.argv[1]
 mail            = sys.argv[2]
 config_file     = sys.argv[3]
 path            = sys.argv[4]
+order_num       = sys.argv[5]
+extrap          = int(2*1000000*float(order_num))
 
 try:
     config  = load_config(config_file)
@@ -48,6 +51,6 @@ module load {2}
 
 cd {4}
 
-preseq lc_extrap -v -B tophat_out_{0}/accepted_hits_sorted_{0}.bam -o tophat_out_{0}/{0}.ccurve.txt
+preseq lc_extrap -e {6} -v -B tophat_out_{0}/accepted_hits_sorted_{0}.bam -o tophat_out_{0}/{0}.ccurve.txt
 
-""".format(name, mail, preseq, bam, path, extra_arg)
+""".format(name, mail, preseq, bam, path, extra_arg, extrap)

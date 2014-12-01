@@ -13,7 +13,6 @@ from scilifelab.db.statusDB_utils import *
 from helpers import *
 import os
 import couchdb
-import bcbio.pipeline.config_utils as cl
 import time
 from datetime import date
 import logging
@@ -88,6 +87,21 @@ class ProjectDB():
         self._get_project_level_info()
         self._make_DB_samples()
         self._get_sequencing_finished()
+        self._get_open_escalations()
+
+    def _get_open_escalations(self):
+        escalation_ids=[]
+        processes=self.lims.get_processes(projectname=self.project.name)
+        for p in processes:
+            step=gent.Step(self.lims, id=p.id)
+            if step.actions.escalation:
+                samples_escalated=set()
+                if step.actions.escalation['status'] == "Pending":
+                    shortid=step.id.split("-")[1]
+                    escalation_ids.append(shortid)
+        if escalation_ids:
+            self.obj['escalations']=escalation_ids
+
 
     def _get_project_level_info(self):
         self.obj = {'source' : 'lims',
@@ -722,8 +736,8 @@ class Prep():
             if library_validation.has_key("size_(bp)"):
                 average_size_bp = library_validation.pop("size_(bp)")
                 library_validation["average_size_bp"] = average_size_bp
-            if latest_caliper_id:
+            if latest_caliper_id and (Process(lims, id=latest_caliper_id['id'])).date_run >= (Process(lims, id=libvalstart['id']).date_run):
                 library_validation["caliper_image"] = get_caliper_img(self.sample_name,
-                                                            latest_caliper_id['id'])
+                                                        latest_caliper_id['id'])
             library_validations[agrlibQCstep['id']] = delete_Nones(library_validation)
         return delete_Nones(library_validations) 
