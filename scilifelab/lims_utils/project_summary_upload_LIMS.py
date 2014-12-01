@@ -14,7 +14,6 @@ from scilifelab.db.statusDB_utils import *
 from functions import *
 from pprint import pprint
 from genologics.lims import *
-from genologics.lims_utils import *
 from genologics.config import BASEURI, USERNAME, PASSWORD
 import objectsDB as DB
 import datetime
