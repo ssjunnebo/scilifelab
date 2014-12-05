@@ -32,6 +32,9 @@ class ProjectDB():
         self.demux = self.lims.get_processes(projectname = self.project.name,
                                                     type = DEMULTIPLEX.values())
         self.demux_procs = ProcessInfo(self.lims, self.demux)
+        self.seq = self.lims.get_processes(projectname = self.project.name,
+                                                    type = SEQUENCING.values())
+        self.seq_procs = ProcessInfo(self.lims, self.seq)
         self._get_project_level_info()
         self._make_DB_samples()
         self._get_sequencing_finished()
@@ -101,6 +104,7 @@ class ProjectDB():
         ## Getting sample info
         samples = self.lims.get_samples(projectlimsid = self.project.id)
         self.obj['no_of_samples'] = len(samples)
+        runinfo=self.demux_procs or self.seq_procs 
         if len(samples) > 0:
             procss_per_art = self.build_processes_per_artifact(self.lims,
                                                          self.project.name)
@@ -112,7 +116,7 @@ class ProjectDB():
                                   self.samp_db,
                                   self.obj['application'],
                                   self.preps.info,
-                                  self.demux_procs.info,
+                                  runinfo.info,
                                   processes_per_artifact = procss_per_art)
                 self.obj['samples'][sampDB.name] = sampDB.obj
                 try:
@@ -212,7 +216,7 @@ class SampleDB():
         initqc = InitialQC(self.lims, self.name, self.processes_per_artifact, 
                                                             self.application)
         self.obj['initial_qc'] = initqc.set_initialqc_info()
-        if self.application in ['Finished library', 'Amplicon']:
+        if self.application in ['Finished library', 'Amplicon with adaptors']:
             chategory = INITALQCFINISHEDLIB.values()
         else:
             chategory = INITALQC.values()
@@ -280,7 +284,7 @@ class SampleDB():
                                     pro_per_art = self.processes_per_artifact)
                     steps = ProcessSpec(history.history, history.history_list, 
                                                              self.application)
-                    if self.application in ['Finished library', 'Amplicon']:
+                    if self.application in ['Finished library', 'Amplicon with adaptors']:
                         key = 'Finished'
                     elif steps.preprepstart:
                         key = steps.preprepstart['id']
@@ -292,7 +296,13 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            try:
+                                dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                                dem_qc=dem_art.qc_flag
+                            except ValueError:
+                                #Miseq projects might not have a demultiplexing step here
+                                #so the artifact id might be None
+                                dem_qc=None
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
@@ -309,7 +319,7 @@ class SampleDB():
                                     'sequencing_start_date' : ssd,
                                     'sequencing_run_QC_finished' : run['start_date'],
                                     'sequencing_finish_date' : sfd,
-                                    'dem_qc_flag' : dem_art.qc_flag,
+                                    'dem_qc_flag' : dem_qc,
                                     'seq_qc_flag' : seq_art.qc_flag}
                                 d = delete_Nones(d)
                                 if not sample_runs.has_key(key):
@@ -458,7 +468,7 @@ class InitialQC():
         outarts = self.lims.get_artifacts(sample_name = self.sample_name,
                                           process_type = AGRINITQC.values())
         if outarts:
-            outart = Artifact(lims, id = max(map(lambda a: a.id, outarts)))
+            outart = Artifact(self.lims, id = max(map(lambda a: a.id, outarts)))
             latestInitQc = outart.parent_process
             inart = latestInitQc.input_per_sample(self.sample_name)[0].id
             history = gent.SampleHistory(sample_name = self.sample_name, 
@@ -635,7 +645,7 @@ class Prep():
             'caliper_image' : None}
 
     def set_prep_info(self, steps, aplication):
-        if aplication in ['Amplicon', 'Finished library']:
+        if aplication in ['Amplicon with adaptors', 'Finished library']:
             self.id2AB = 'Finished'
         else:
             if steps.prepstart:
