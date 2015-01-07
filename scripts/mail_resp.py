@@ -25,6 +25,7 @@ email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Senthilkumar Paneerselvam':'senthilkumar.paneerselvam@scilifelab.se',
         u'Carolina Bonilla':'carolina.bonilla@scilifelab.se',
         u'Helena Samuelsson':'helena.samuelsson@scilifelab.se',
+        u'Helena Zajac':'helena.zajac@scilifelab.se',
         u'Mario Giovacchini':'mario.giovacchini@scilifelab.se',
         u'Marianna Sjogren':'marianna.sjogren@scilifelab.se',
         u'Jun Wang':'jun.wang@scilifelab.se',
@@ -125,3 +126,8 @@ for the projects you are described as "Lab responsible" or "Bioinfo Responsible"
         s = smtplib.SMTP('smtp.ki.se')
         s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
         s.quit()
+
+
+
+
+
