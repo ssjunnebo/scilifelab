@@ -66,10 +66,10 @@ def project_aborted(project):
     """ Checks the 'Aborted' udf of lims project. Returns true if it exists
     """
     try:
-        is_aborted = False
+        is_aborted = True
         date = project.udf['Aborted']
     except:
-        is_aborted = True
+        is_aborted = False
     finally:
         return is_aborted
  
