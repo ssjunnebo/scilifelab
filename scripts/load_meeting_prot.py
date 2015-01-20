@@ -22,7 +22,7 @@ def get_ws(wsheet_title,ssheet):
     ws_key = bcbio.google.spreadsheet.get_key(wsheet)
     return ws_key, content
 
-def get_meeting_info(content):
+def get_meeting_info_from_wsheet(content):
     "Feching info from old metting protocol"
     flow_cell = None
     data = {}
@@ -48,11 +48,12 @@ def sort_by_name(namelist):
     sorted_name_dict = sorted(name_dict.iteritems(), key=operator.itemgetter(1))
     return sorted_name_dict
 
-def pars_file(file, ongoing_deliveries, content):
+def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
     """parses output from script "update_checklist.py", which is loading runinfo
     from the trello board. ongoing_deliverues is a dict of info from old meeting
     that will be merged with the new info feched from trello."""
-    f = open(file,'r')
+    ongoing_deliveries = get_meeting_info_from_wsheet(old_wsheet_content)
+    f = open(trello_dump,'r')
     content = f.readlines()
     coming_deliveries = {}
     dict_holder = coming_deliveries
@@ -78,10 +79,11 @@ def pars_file(file, ongoing_deliveries, content):
                 if not dict_holder[proj_name]['flowcells'].has_key(row):
                     dict_holder[proj_name]['flowcells'][row] = []
                 proj_name = None
-    return coming_deliveries, ongoing_deliveries
+    return {'coming' : coming_deliveries, 'ongoing' : ongoing_deliveries}
 
-def update(sorted_names, col, info, ss_key, ws_key):
+def update(col, info, ss_key, ws_key):
     """Uppdates the new meeting protocol with old and new info."""
+    sorted_names = sort_by_name(info.keys())
     row = 2
     for proj_name in sorted_names:
         proj_name = proj_name[0]
@@ -100,17 +102,15 @@ def update(sorted_names, col, info, ss_key, ws_key):
         row += 2
 
 def main(old_wsheet, new_wsheet, file_dump, ssheet_title):
-    ssheet = bcbio.google.spreadsheet.get_spreadsheet(CLIENT,ssheet_title)
+    ssheet = bcbio.google.spreadsheet.get_spreadsheet(CLIENT, ssheet_title)
     assert ssheet is not None, "Could not find spreadsheet %s" % ssheet_title
     ss_key = bcbio.google.spreadsheet.get_key(ssheet)
-    ws_key, content = get_ws(old_wsheet,ssheet)
-    ongoing_deliveries = get_meeting_info(content)
-    coming_deliveries, ongoing_deliveries = pars_file(file_dump, ongoing_deliveries, content)
-    sorted_ongoing_names = sort_by_name(ongoing_deliveries.keys())
-    sorted_comming_names = sort_by_name(coming_deliveries.keys())
-    ws_key, content = get_ws(new_wsheet,ssheet)
-    update(sorted_ongoing_names, 1, ongoing_deliveries, ss_key, ws_key)
-    update(sorted_comming_names, 4, coming_deliveries,ss_key, ws_key)
+    dummy, old_wsheet_content = get_ws(old_wsheet, ssheet)
+    new_ws_key, dummy = get_ws(new_wsheet, ssheet)
+
+    new_wsheet_content = merge_info_from_file_and_wsheet(file_dump, old_wsheet_content)
+    update(1, new_wsheet_content['ongoing'], ss_key, new_ws_key)
+    update(4, new_wsheet_content['coming'], ss_key, new_ws_key)
 
 if __name__ == "__main__":
     parser = OptionParser(usage = """load_meeting_prot.py <Arguments> [Options]
