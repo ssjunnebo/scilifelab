@@ -20,10 +20,12 @@ def setupLog(args):
 def main(args):
     log=setupLog(args)
     lims = Lims(BASEURI, USERNAME, PASSWORD)
+    #this will decide how far back we are looking
     yesterday = datetime.today() - timedelta(args.days)
     stryes=yesterday.strftime("%Y-%m-%dT%H:%M:%SZ")
     wsts=lims.get_processes(type=pc.WORKSET.values(),last_modified=stryes)
     #wsts=lims.get_processes(type=pc.WORKSET.values())
+    wsts=[Process(lims, id='24-79196')]
     for pr in wsts:
         lc=LimsCrawler(lims, pr)
         ws=Workset(lims,lc)
@@ -65,6 +67,7 @@ class Workset:
             if out.type == "Analyte" and len(out.samples) == 1 :
                 self.name.add(out.location[0].name)
         self.obj['name']=self.name.pop()
+        self.obj['technician']=crawler.starting_proc.technician.initials
         pjs={}
         for p in crawler.projects:
             pjs[p.id]={}
@@ -79,12 +82,27 @@ class Workset:
                     pjs[p.id]['samples'][sample.name]={}
                     pjs[p.id]['samples'][sample.name]['library']={}
                     pjs[p.id]['samples'][sample.name]['sequencing']={}
+                    try:
+                        pjs[p.id]['samples'][sample.name]['Customer Name']=sample.udf['Customer Name']
+                    except KeyError:
+                        pjs[p.id]['samples'][sample.name]['Customer Name']= None
+
+
+                    pjs[p.id]['samples'][sample.name]['rec_ctrl']= {}
+                    for i in crawler.inputs:
+                        if sample in i.samples:
+                            pjs[p.id]['samples'][sample.name]['rec_ctrl']['status']=i.qc_flag
+                       
+                    for output in crawler.starting_proc.all_outputs():
+                        if output.type == "Analyte" and sample in output.samples:
+                            pjs[p.id]['samples'][sample.name]['location']=output.location[1]
                     for lib in crawler.libaggre:
                         for inp in lib.all_inputs():
                             if sample in inp.samples :
                                 pjs[p.id]['samples'][sample.name]['library'][lib.id]={}
                                 pjs[p.id]['samples'][sample.name]['library'][lib.id]['status']=inp.qc_flag
                                 pjs[p.id]['samples'][sample.name]['library'][lib.id]['date']=lib.date_run
+                                pjs[p.id]['samples'][sample.name]['library'][lib.id]['name']=lib.protocol_name
 
                     for seq in crawler.seq:
                         for inp in seq.all_inputs():
@@ -113,9 +131,11 @@ class LimsCrawler:
         self.libaggre=set()
         self.seq=set()
         self.demux=set()
+        self.inputs=set()
         for i in starting_proc.all_inputs():
             if i.type == "Analyte":
                 self.samples.update(i.samples)
+                self.inputs.add(i)
         for sample in self.samples:
             if sample.project:
                 self.projects.add(sample.project)
