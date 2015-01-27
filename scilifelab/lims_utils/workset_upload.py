@@ -72,10 +72,15 @@ class Workset:
         for p in crawler.projects:
             pjs[p.id]={}
             pjs[p.id]['name']=p.name
-            if "library" in p.udf:
+            try:
                 pjs[p.id]['library']=p.udf['Library construction method']
-            if "application" in p.udf:
+            except KeyError:
+                pjs[p.id]['library']=None
+            try:
                 pjs[p.id]['application']=p.udf['Application']
+            except KeyError:
+                pjs[p.id]['application']=None
+
             pjs[p.id]['samples']={}
             for sample in crawler.samples:
                 if sample.project == p:
