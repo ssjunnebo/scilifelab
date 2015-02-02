@@ -15,7 +15,8 @@ pjs=lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
 
 operator="denis.moreno@scilifelab.se"
 summary={}
-email={u'Bahram Amini':'bahram.amini@scilifelab.se',
+email={u'Anna Konrad':'anna.konrad@scilifelab.se',
+        u'Bahram Amini':'bahram.amini@scilifelab.se',
         u'Britta Lotstedt':'britta.lotstedt@scilifelab.se',
         u'Carolina Bonilla':'carolina.bonilla@scilifelab.se',
         u'Chuan Wang':'chuan.wang@scilifelab.se',
@@ -31,8 +32,9 @@ email={u'Bahram Amini':'bahram.amini@scilifelab.se',
         u'Nemanja Rilakovic':'nemanja.rilakovic@scilifelab.se',
         u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se',
         u'Par Lundin':'par.lundin@scilifelab.se',
+        u'Phil Ewels':'phil.ewels@scilifelab.se',
         u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
-        u'Senthilkumar Paneerselvam':'senthilkumar.paneerselvam@scilifelab.se',
+        u'Senthilkumar Paneerselvam':'senthilkumar.panneerselvam@scilifelab.se',
         u'Simone Picelli':'simone.picelli@scilifelab.se'
         }
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
