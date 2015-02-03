@@ -12,7 +12,6 @@ import multiprocessing as mp
 import Queue
 import logging
 import logging.handlers
-from pprint import pprint
 
 def setupLog(args):
     mainlog = logging.getLogger('worksetlogger')
@@ -24,32 +23,32 @@ def setupLog(args):
     return mainlog
 
 def main(args):
-    log=setupLog(args)
+    log = setupLog(args)
     lims = Lims(BASEURI, USERNAME, PASSWORD)
     #this will decide how far back we are looking
     if args.ws:
-        wsp=Process(lims, id=args.ws)
-        lc=LimsCrawler(lims, wsp)
+        wsp = Process(lims, id=args.ws)
+        lc = LimsCrawler(lims, wsp)
         try:
-            ws=Workset(lims,lc, log)
+            ws = Workset(lims,lc, log)
         except NameError:
             log.error("no name found for this workset")
         #pprint(ws.obj)
-        mycouch=sdb.Couch()
+        mycouch = sdb.Couch()
         mycouch.set_db("worksets")
         mycouch.connect()
         view = mycouch.db.view('worksets/name')
         #If there is already a workset with that name in the DB
         if len(view[ws.obj['name']].rows) == 1:
-            remote_doc=view[ws.obj['name']].rows[0].value
+            remote_doc = view[ws.obj['name']].rows[0].value
             #remove id and rev for comparison
-            doc_id=remote_doc.pop('_id')
-            doc_rev=remote_doc.pop('_rev')
+            doc_id = remote_doc.pop('_id')
+            doc_rev = remote_doc.pop('_rev')
             if remote_doc != ws.obj:
                 #if they are different, though they have the same name, upload the new one
-                ws.obj['_id']=doc_id
-                ws.obj['_rev']=doc_rev
-                mycouch.db[doc_id]=ws.obj 
+                ws.obj['_id'] = doc_id
+                ws.obj['_rev'] = doc_rev
+                mycouch.db[doc_id] = ws.obj 
                 log.info("updating {0}".format(ws.obj['name']))
         elif len(view[ws.obj['name']].rows) == 0:
             #it is a new doc, upload it
@@ -59,8 +58,8 @@ def main(args):
             log.warn("more than one row with name {0} found".format(ws.obj['name']))
     else:
         yesterday = datetime.today() - timedelta(args.days)
-        stryes=yesterday.strftime("%Y-%m-%dT%H:%M:%SZ")
-        wsts=lims.get_processes(type=pc.WORKSET.values(),last_modified=stryes)
+        stryes = yesterday.strftime("%Y-%m-%dT%H:%M:%SZ")
+        wsts = lims.get_processes(type=pc.WORKSET.values(),last_modified=stryes)
         masterProcess(args, wsts, lims, log)
     
     
@@ -68,12 +67,12 @@ def main(args):
 class Workset:
 
     def __init__(self, lims, crawler, log):
-        self.log=log
-        self.name=set()
-        self.lims=lims
+        self.log = log
+        self.name = set()
+        self.lims = lims
         self.obj={}
         #get the identifier
-        outs=crawler.starting_proc.all_outputs()
+        outs = crawler.starting_proc.all_outputs()
         for out in outs:
             if out.type == "Analyte" and len(out.samples) == 1 :
                 try:
@@ -82,59 +81,61 @@ class Workset:
                     self.log.warn("no name found for workset {}".format(out.id))
 
         try:      
-            self.obj['name']=self.name.pop()
+            self.obj['name'] = self.name.pop()
         except:
             self.log.error("No name found for current workset {}, might be an ongoing step.".format(crawler.starting_proc.id))
             raise NameError
         self.obj['technician']=crawler.starting_proc.technician.initials
-        pjs={}
+        self.obj['id']=crawler.starting_proc.id
+        self.obj['date_run']=crawler.starting_proc.date_run
+        pjs = {}
         for p in crawler.projects:
-            pjs[p.id]={}
-            pjs[p.id]['name']=p.name
+            pjs[p.id] = {}
+            pjs[p.id]['name'] = p.name
             try:
-                pjs[p.id]['library']=p.udf['Library construction method']
+                pjs[p.id]['library'] = p.udf['Library construction method']
             except KeyError:
-                pjs[p.id]['library']=None
+                pjs[p.id]['library'] = None
             try:
-                pjs[p.id]['application']=p.udf['Application']
+                pjs[p.id]['application'] = p.udf['Application']
             except KeyError:
-                pjs[p.id]['application']=None
+                pjs[p.id]['application'] = None
 
-            pjs[p.id]['samples']={}
+            pjs[p.id]['samples'] = {}
             for sample in crawler.samples:
                 if sample.project == p:
-                    pjs[p.id]['samples'][sample.name]={}
-                    pjs[p.id]['samples'][sample.name]['library']={}
-                    pjs[p.id]['samples'][sample.name]['sequencing']={}
+                    pjs[p.id]['samples'][sample.name] = {}
+                    pjs[p.id]['samples'][sample.name]['library'] = {}
+                    pjs[p.id]['samples'][sample.name]['sequencing'] = {}
                     try:
-                        pjs[p.id]['samples'][sample.name]['customer_name']=sample.udf['Customer Name']
+                        pjs[p.id]['samples'][sample.name]['customer_name'] = sample.udf['Customer Name']
                     except KeyError:
-                        pjs[p.id]['samples'][sample.name]['customer_name']= None
+                        pjs[p.id]['samples'][sample.name]['customer_name'] = None
 
 
-                    pjs[p.id]['samples'][sample.name]['rec_ctrl']= {}
+                    pjs[p.id]['samples'][sample.name]['rec_ctrl'] = {}
                     for i in crawler.starting_proc.all_inputs():
                         if sample in i.samples:
-                            pjs[p.id]['samples'][sample.name]['rec_ctrl']['status']=i.qc_flag
+                            pjs[p.id]['samples'][sample.name]['rec_ctrl']['status'] = i.qc_flag
                        
                     for output in crawler.starting_proc.all_outputs():
                         if output.type == "Analyte" and sample in output.samples:
-                            pjs[p.id]['samples'][sample.name]['location']=output.location[1]
+                            pjs[p.id]['samples'][sample.name]['location'] = output.location[1]
 
                     
 
                     for lib in sorted(crawler.libaggre, key=lambda l:l.date_run, reverse=True):
                         for inp in lib.all_inputs():
                             if sample in inp.samples :
-                                onelib={}
-                                onelib['status']=inp.qc_flag
-                                onelib['art']=inp.id
-                                onelib['date']=lib.date_run
-                                onelib['name']=lib.protocol_name
-                                onelib['id']=lib.id
-                                pjs[p.id]['samples'][sample.name]['library'][lib.id]=onelib
+                                onelib = {}
+                                onelib['status'] = inp.qc_flag
+                                onelib['art'] = inp.id
+                                onelib['date'] = lib.date_run
+                                onelib['name'] = lib.protocol_name
+                                onelib['id'] = lib.id
+                                pjs[p.id]['samples'][sample.name]['library'][lib.id] = onelib
                                 if 'library_status' not in  pjs[p.id]['samples'][sample.name]:
-                                    pjs[p.id]['samples'][sample.name]['library_status']=inp.qc_flag
+                                    pjs[p.id]['samples'][sample.name]['library_status'] = inp.qc_flag
 
 
 
@@ -142,29 +143,29 @@ class Workset:
                     for seq in sorted(crawler.seq, key=lambda s:s.date_run, reverse=True):
                         for inp in seq.all_inputs():
                             if sample in inp.samples :
-                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id]={}
-                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id]['status']=inp.qc_flag
-                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id]['date']=seq.date_run
+                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id] = {}
+                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id]['status'] = inp.qc_flag
+                                pjs[p.id]['samples'][sample.name]['sequencing'][seq.id]['date'] = seq.date_run
                                 if 'sequencing_status' not in  pjs[p.id]['samples'][sample.name]:
-                                    pjs[p.id]['samples'][sample.name]['sequencing_status']=inp.qc_flag
+                                    pjs[p.id]['samples'][sample.name]['sequencing_status'] = inp.qc_flag
 
-        self.obj['projects']=pjs
+        self.obj['projects'] = pjs
                     
 class LimsCrawler:
     
     def __init__(self, lims,starting_proc):
-        self.lims=lims
-        self.starting_proc=starting_proc
-        self.samples=set()
-        self.projects=set()
-        self.preprepstart=set()
-        self.prepstart=set()
-        self.prepend=set()
-        self.libval=set()
-        self.libaggre=set()
-        self.seq=set()
-        self.demux=set()
-        self.inputs=set()
+        self.lims = lims
+        self.starting_proc = starting_proc
+        self.samples = set()
+        self.projects = set()
+        self.preprepstart = set()
+        self.prepstart = set()
+        self.prepend = set()
+        self.libval = set()
+        self.libaggre = set()
+        self.seq = set()
+        self.demux = set()
+        self.inputs = set()
         for i in starting_proc.all_inputs():
             if i.type == "Analyte":
                 self.samples.update(i.samples)
@@ -201,14 +202,14 @@ class LimsCrawler:
 
 
 def processWSUL(options, queue, logqueue):
-    mycouch=sdb.Couch()
+    mycouch = sdb.Couch()
     mycouch.set_db("worksets")
     mycouch.connect()
     view = mycouch.db.view('worksets/name')
     mylims = Lims(BASEURI, USERNAME, PASSWORD)
     work=True
-    procName=mp.current_process().name
-    proclog=logging.getLogger(procName)
+    procName = mp.current_process().name
+    proclog = logging.getLogger(procName)
     proclog.setLevel(level=logging.INFO)
     mfh = QueueHandler(logqueue)
     mft = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -220,14 +221,14 @@ def processWSUL(options, queue, logqueue):
         try:
             ws_id = queue.get(block=True, timeout=3)
         except Queue.Empty:
-            work=False
+            work = False
             proclog.info("exiting gracefully")
             break
         else:
-            wsp=Process(mylims, id=ws_id)
-            lc=LimsCrawler(mylims, wsp)
+            wsp = Process(mylims, id=ws_id)
+            lc = LimsCrawler(mylims, wsp)
             try:
-                ws=Workset(mylims,lc, proclog)
+                ws = Workset(mylims,lc, proclog)
             except NameError:
                 continue
 
@@ -235,13 +236,13 @@ def processWSUL(options, queue, logqueue):
             if len(view[ws.obj['name']].rows) == 1:
                 remote_doc=view[ws.obj['name']].rows[0].value
                 #remove id and rev for comparison
-                doc_id=remote_doc.pop('_id')
-                doc_rev=remote_doc.pop('_rev')
+                doc_id = remote_doc.pop('_id')
+                doc_rev = remote_doc.pop('_rev')
                 if remote_doc != ws.obj:
                     #if they are different, though they have the same name, upload the new one
-                    ws.obj['_id']=doc_id
-                    ws.obj['_rev']=doc_rev
-                    mycouch.db[doc_id]=ws.obj 
+                    ws.obj['_id'] = doc_id
+                    ws.obj['_rev'] = doc_rev
+                    mycouch.db[doc_id] = ws.obj 
                     proclog.info("updating {0}".format(ws.obj['name']))
             elif len(view[ws.obj['name']].rows) == 0:
                 #it is a new doc, upload it
@@ -253,18 +254,18 @@ def processWSUL(options, queue, logqueue):
             queue.task_done()
 
 def masterProcess(options,wslist, mainlims, logger):
-    worksetQueue=mp.JoinableQueue()
-    logQueue=mp.Queue()
-    childs=[]
-    procs_nb=1;
+    worksetQueue = mp.JoinableQueue()
+    logQueue = mp.Queue()
+    childs = []
+    procs_nb = 1;
     #Initial step : order worksets by date:
     logger.info("ordering the workset list")
-    orderedwslist=sorted(wslist, key=lambda x:x.date_run)
+    orderedwslist = sorted(wslist, key=lambda x:x.date_run)
     logger.info("done ordering the workset list")
     if len(wslist) < options.procs:
-        procs_nb=len(wslist)
+        procs_nb = len(wslist)
     else:
-        procs_nb=options.procs
+        procs_nb = options.procs
 
     #spawn a pool of processes, and pass them queue instance 
     for i in range(procs_nb):
@@ -279,18 +280,18 @@ def masterProcess(options,wslist, mainlims, logger):
     notDone=True
     while notDone:
         try:
-            log=logQueue.get(False)
+            log = logQueue.get(False)
             logger.handle(log)
         except Queue.Empty:
             if not stillRunning(childs):
-                notDone=False
+                notDone = False
                 break
 
 def stillRunning(processList):
-    ret=False
+    ret = False
     for p in processList:
         if p.is_alive():
-            ret=True
+            ret = True
 
     return ret
 
