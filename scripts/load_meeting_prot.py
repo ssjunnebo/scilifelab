@@ -78,6 +78,13 @@ def sort_by_name(namelist):
     sorted_name_dict = sorted(name_dict.iteritems(), key=operator.itemgetter(1))
     return sorted_name_dict
 
+def starts_with_project_name(string):
+    if len(string) > 2:
+        if string[1] == '.' or string[2] == '.':
+            return True
+    return False
+
+
 def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
     """Collects info from old meeting protocol with get_meeting_info_from_wsheet.
     Then parses trello_dump - output from script "update_checklist.py", which is
@@ -98,30 +105,34 @@ def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
 
     ongoing_projects = get_meeting_info_from_wsheet(old_wsheet_content)
     f = open(trello_dump,'r')
-    content = f.readlines()
+    trello_dump_content = f.readlines()
     coming_projects = {}
     dict_holder = coming_projects
     proj_name = None
-    for row in content:
-        row = row.strip()
-        if row == "Ongoing":
+    for trello_dump_row in trello_dump_content:
+        trello_dump_row = trello_dump_row.strip()
+        if trello_dump_row == "Ongoing":
             dict_holder = ongoing_projects
-        if row:
-            if len(row) > 2 and row[1] == '.' or row[2] == '.':
-                row_list = row.split()
+        if trello_dump_row:
+            if starts_with_project_name(trello_dump_row):
+                # checked if row starts with project name
+                row_list = trello_dump_row.split()
                 proj_name = row_list[0]
                 info = ' '.join(row_list[1:])
                 if not proj_name in dict_holder.keys():
                     dict_holder[proj_name] = {'info' : info, 'flowcells' : {}}
-            elif proj_name and not row[0].isdigit():
+            elif proj_name and not trello_dump_row[0].isdigit():
+                # if row is not a flowcell id it is some kind of info
                 if dict_holder[proj_name].has_key('info'):
-                    if row not in dict_holder[proj_name]['info']:
+                    if trello_dump_row not in dict_holder[proj_name]['info']:
+                        # adding more info to the info string
                         info = dict_holder[proj_name]['info']
-                        more_info = ' - '.join([info, row])
+                        more_info = ' - '.join([info, trello_dump_row])
                         dict_holder[proj_name]['info'] = more_info
-            elif proj_name and row[0].isdigit():
-                if not dict_holder[proj_name]['flowcells'].has_key(row):
-                    dict_holder[proj_name]['flowcells'][row] = []
+            elif proj_name and trello_dump_row[0].isdigit():
+                # checked if row is flowcell id
+                if not dict_holder[proj_name]['flowcells'].has_key(trello_dump_row):
+                    dict_holder[proj_name]['flowcells'][trello_dump_row] = []
                 proj_name = None
     return {'coming' : coming_projects, 'ongoing' : ongoing_projects}
 
