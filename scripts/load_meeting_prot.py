@@ -1,4 +1,4 @@
-"""This script loada info from trello and merge with info from latest meeting 
+"""This script load info from trello and merge with info from latest meeting 
 protocol. It then loads a new meeting protocol with the merged info devided into
 comming and ongoing deliveries. The info consists of project name,project info, 
 flow cell ids and comments."""
@@ -23,7 +23,10 @@ def get_ws(wsheet_title,ssheet):
     return ws_key, content
 
 def get_meeting_info_from_wsheet(content):
-    """Feching info from old metting protocol. Example to show data structure:
+    """Feching info from old metting protocol and stores it in a dictionary 
+    meeting_info. 
+    
+    Example:
 
     If google meeting protocol looks like this:
 
@@ -40,9 +43,9 @@ def get_meeting_info_from_wsheet(content):
     |                    |140411_SN7001362_0119_BC42B3ACXX            |Delivered and closed |
     |--------------------|--------------------------------------------|---------------------|
 
-    data will look like this:
+    meeting_info will look like this:
     
-    data = {C.Dixelius_13_04 : 
+    meeting_info = {C.Dixelius_13_04 : 
                 {'info' : '- Production - Jun - RNA-seq (total RNA)', 
                  'flowcells' : {'140228_SN1025_0204_BC3TYRACXX' : 'FAILed run',
                                 '140314_SN1025_0206_BC3YL6ACXX' : 'Delivery onhold.',
@@ -52,20 +55,20 @@ def get_meeting_info_from_wsheet(content):
                  'flowcells' : {'140228_SN1025_0204_BC3TYRACXX' : 'deliv to Application',
                                 '140411_SN7001362_0119_BC42B3ACXX' : 'Delivered and closed '}}}"""
     flow_cell = None
-    data = {}
+    meeting_info = {}
     for row in content:
         col_A = row[0].strip()
         col_B = row[1].strip()
         col_C = row[2].strip()
         if col_A and col_A != 'Ongoing deliveries':
             proj_name = col_A
-            data[proj_name] = {'info': col_B, 'flowcells':{}}
+            meeting_info[proj_name] = {'info': col_B, 'flowcells':{}}
         elif col_B:
             flow_cell = col_B
-            data[proj_name]['flowcells'][flow_cell] = [col_C]
+            meeting_info[proj_name]['flowcells'][flow_cell] = [col_C]
         elif col_C and flow_cell:
-            data[proj_name]['flowcells'][flow_cell].append(col_C)
-    return data
+            meeting_info[proj_name]['flowcells'][flow_cell].append(col_C)
+    return meeting_info
 
 def sort_by_name(namelist):
     "Sorts dict alphabeticly by project sure name"
@@ -81,6 +84,7 @@ def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
     loading runinfo from the trello board. 
     Merges the info from the old meeting prot with the info from the trello dump.
     Returns a dict with information about comming and ongoing deliveries.
+
         ongoing:    ongoing_projects is a dict with info from old meeting that 
                     is merged with new info feched from trello. A project is
                     ongoing if it has a flowcell that has been sequenced and 
