@@ -23,7 +23,7 @@ def get_ws(wsheet_title,ssheet):
     return ws_key, content
 
 def get_meeting_info_from_wsheet(content):
-    "Feching info from old metting protocol. Example to show data structure:
+    """Feching info from old metting protocol. Example to show data structure:
 
     If google meeting protocol looks like this:
 
@@ -50,7 +50,7 @@ def get_meeting_info_from_wsheet(content):
             CM.Dixelius_13_05 : 
                 {'info' : '- Production - Par - de novo ', 
                  'flowcells' : {'140228_SN1025_0204_BC3TYRACXX' : 'deliv to Application',
-                                '140411_SN7001362_0119_BC42B3ACXX' : 'Delivered and closed '}}}"
+                                '140411_SN7001362_0119_BC42B3ACXX' : 'Delivered and closed '}}}"""
     flow_cell = None
     data = {}
     for row in content:
