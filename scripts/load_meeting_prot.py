@@ -23,7 +23,34 @@ def get_ws(wsheet_title,ssheet):
     return ws_key, content
 
 def get_meeting_info_from_wsheet(content):
-    "Feching info from old metting protocol"
+    "Feching info from old metting protocol. Example to show data structure:
+
+    If google meeting protocol looks like this:
+
+    |--------------------|--------------------------------------------|---------------------|
+    |col A               |col B                                       |col c                |
+    |--------------------|--------------------------------------------|---------------------|
+    |C.Dixelius_13_04    |- Production - Jun - RNA-seq (total RNA)    |                     |
+    |                    |140228_SN1025_0204_BC3TYRACXX               |FAILed run           |
+    |                    |140314_SN1025_0206_BC3YL6ACXX               |Delivery onhold.     |
+    |                    |140407_SN7001301_0127_BH8M8MADXX            |Delivered and closed |
+    |                    |                                            |                     |
+    |CM.Dixelius_13_05   |- Production - Par - de novo                |                     |
+    |                    |140314_SN1025_0206_BC3YL6ACXX               |deliv to Application |
+    |                    |140411_SN7001362_0119_BC42B3ACXX            |Delivered and closed |
+    |--------------------|--------------------------------------------|---------------------|
+
+    data will look like this:
+    
+    data = {C.Dixelius_13_04 : 
+                {'info' : '- Production - Jun - RNA-seq (total RNA)', 
+                 'flowcells' : {'140228_SN1025_0204_BC3TYRACXX' : 'FAILed run',
+                                '140314_SN1025_0206_BC3YL6ACXX' : 'Delivery onhold.',
+                                '140407_SN7001301_0127_BH8M8MADXX' : 'Delivered and closed'}},
+            CM.Dixelius_13_05 : 
+                {'info' : '- Production - Par - de novo ', 
+                 'flowcells' : {'140228_SN1025_0204_BC3TYRACXX' : 'deliv to Application',
+                                '140411_SN7001362_0119_BC42B3ACXX' : 'Delivered and closed '}}}"
     flow_cell = None
     data = {}
     for row in content:
@@ -49,19 +76,32 @@ def sort_by_name(namelist):
     return sorted_name_dict
 
 def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
-    """parses output from script "update_checklist.py", which is loading runinfo
-    from the trello board. ongoing_deliverues is a dict of info from old meeting
-    that will be merged with the new info feched from trello."""
-    ongoing_deliveries = get_meeting_info_from_wsheet(old_wsheet_content)
+    """Collects info from old meeting protocol with get_meeting_info_from_wsheet.
+    Then parses trello_dump - output from script "update_checklist.py", which is
+    loading runinfo from the trello board. 
+    Merges the info from the old meeting prot with the info from the trello dump.
+    Returns a dict with information about comming and ongoing deliveries.
+        ongoing:    ongoing_projects is a dict with info from old meeting that 
+                    is merged with new info feched from trello. A project is
+                    ongoing if it has a flowcell that has been sequenced and 
+                    demultiplexed. 
+                    Dict structure as described in get_meeting_info_from_wsheet.
+        comming:    coming_projects is a dict with info feched from trello.
+                    A project is ongoing if it has no flowcells that has been 
+                    sequenced and demultiplexed, but has flocells that are 
+                    currently being so. 
+                    Dict structure as described in get_meeting_info_from_wsheet."""
+
+    ongoing_projects = get_meeting_info_from_wsheet(old_wsheet_content)
     f = open(trello_dump,'r')
     content = f.readlines()
-    coming_deliveries = {}
-    dict_holder = coming_deliveries
+    coming_projects = {}
+    dict_holder = coming_projects
     proj_name = None
     for row in content:
         row = row.strip()
         if row == "Ongoing":
-            dict_holder = ongoing_deliveries
+            dict_holder = ongoing_projects
         if row:
             if len(row) > 2 and row[1] == '.' or row[2] == '.':
                 row_list = row.split()
@@ -79,26 +119,41 @@ def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
                 if not dict_holder[proj_name]['flowcells'].has_key(row):
                     dict_holder[proj_name]['flowcells'][row] = []
                 proj_name = None
-    return {'coming' : coming_deliveries, 'ongoing' : ongoing_deliveries}
+    return {'coming' : coming_projects, 'ongoing' : ongoing_projects}
 
-def update(col, info, ss_key, ws_key):
-    """Uppdates the new meeting protocol with old and new info."""
-    sorted_names = sort_by_name(info.keys())
-    row = 2
+def update(project_status, new_meeting_content, ss_key, ws_key):
+    """Uppdates the new meeting protocol with old and new info stored in 
+    new_meeting_content - a dictionary structured as described in 
+    get_meeting_info_from_wsheet"""
+
+    if project_status == 'ongoing':
+        col = 1 # starts updating ws from first kolumn if project is ongoing
+        meeting_info_dict = new_meeting_content['ongoing']
+    elif project_status == 'coming':
+        col = 4 # starts updating ws from fourth kolumn if project is comming
+        meeting_info_dict = new_meeting_content['coming']
+
+    sorted_names = sort_by_name(meeting_info_dict.keys())
+    row = 2     # starts at the second row in the ws (first row contains headers)
     for proj_name in sorted_names:
         proj_name = proj_name[0]
+        # updates project name in column col and project type info in column col+1 
         CLIENT.UpdateCell(row, col, proj_name , ss_key, ws_key)
-        CLIENT.UpdateCell(row, col+1, info[proj_name]['info'] , ss_key, ws_key)
-        sorted_fcs = sorted(info[proj_name]['flowcells'].keys())
+        CLIENT.UpdateCell(row, col+1, meeting_info_dict[proj_name]['info'] , 
+                                                            ss_key, ws_key)
+        sorted_fcs = sorted(meeting_info_dict[proj_name]['flowcells'].keys())
         for fc in sorted_fcs:
             row += 1
             comments_row = row
+            # updates flowcell name in column col+1 
             CLIENT.UpdateCell(row, col+1, fc, ss_key, ws_key)
-            for comment in info[proj_name]['flowcells'][fc]:
+            for comment in meeting_info_dict[proj_name]['flowcells'][fc]:
+                # updates comments per flowcell in column col+2 
                 CLIENT.UpdateCell(comments_row, col+2, comment, ss_key, ws_key)
                 comments_row += 1
             if row != comments_row:
                 row = comments_row - 1
+        # adds an empty row after every project
         row += 2
 
 def main(old_wsheet, new_wsheet, file_dump, ssheet_title):
@@ -109,8 +164,8 @@ def main(old_wsheet, new_wsheet, file_dump, ssheet_title):
     new_ws_key, dummy = get_ws(new_wsheet, ssheet)
 
     new_wsheet_content = merge_info_from_file_and_wsheet(file_dump, old_wsheet_content)
-    update(1, new_wsheet_content['ongoing'], ss_key, new_ws_key)
-    update(4, new_wsheet_content['coming'], ss_key, new_ws_key)
+    update(project_status = 'ongoing', new_wsheet_content, ss_key, new_ws_key)
+    update(project_status = 'coming' , new_wsheet_content, ss_key, new_ws_key)
 
 if __name__ == "__main__":
     parser = OptionParser(usage = """load_meeting_prot.py <Arguments> [Options]
