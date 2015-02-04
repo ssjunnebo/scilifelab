@@ -11,14 +11,10 @@ import operator
 from optparse import OptionParser
 from datetime import date, timedelta
 
-CREDENTIALS_FILE = os.path.join(os.environ['HOME'], 'opt/config/gdocs_credentials')
-credentials = bcbio.google.get_credentials({'gdocs_upload': {'gdocs_credentials': CREDENTIALS_FILE}})
-CLIENT = bcbio.google.spreadsheet.get_client(credentials)
-
-def get_ws(wsheet_title,ssheet):
-    wsheet = bcbio.google.spreadsheet.get_worksheet(CLIENT,ssheet,wsheet_title)
+def get_ws(wsheet_title, ssheet, client):
+    wsheet = bcbio.google.spreadsheet.get_worksheet(client,ssheet,wsheet_title)
     assert wsheet is not None, "Could not find worksheet %s within spreadsheet %s" % (wsheet_title,ssheet)
-    content = bcbio.google.spreadsheet.get_cell_content(CLIENT,ssheet,wsheet)
+    content = bcbio.google.spreadsheet.get_cell_content(client,ssheet,wsheet)
     ws_key = bcbio.google.spreadsheet.get_key(wsheet)
     return ws_key, content
 
@@ -74,6 +70,7 @@ def sort_by_name(namelist):
     "Sorts dict alphabeticly by project sure name"
     name_dict = {}
     for proj_name in namelist:
+        print proj_name
         name_dict[proj_name] = proj_name.split('.')[1].strip()
     sorted_name_dict = sorted(name_dict.iteritems(), key=operator.itemgetter(1))
     return sorted_name_dict
@@ -137,7 +134,7 @@ def merge_info_from_file_and_wsheet(trello_dump, old_wsheet_content):
                 proj_name = None
     return {'coming' : coming_projects, 'ongoing' : ongoing_projects}
 
-def update(project_status, new_meeting_content, ss_key, ws_key):
+def update(project_status, new_meeting_content, ss_key, ws_key, client):
     """Uppdates the new meeting protocol with old and new info stored in 
     new_meeting_content - a dictionary structured as described in 
     get_meeting_info_from_wsheet"""
@@ -154,34 +151,34 @@ def update(project_status, new_meeting_content, ss_key, ws_key):
     for proj_name in sorted_names:
         proj_name = proj_name[0]
         # updates project name in column col and project type info in column col+1 
-        CLIENT.UpdateCell(row, col, proj_name , ss_key, ws_key)
-        CLIENT.UpdateCell(row, col+1, meeting_info_dict[proj_name]['info'] , 
+        client.UpdateCell(row, col, proj_name , ss_key, ws_key)
+        client.UpdateCell(row, col+1, meeting_info_dict[proj_name]['info'] , 
                                                             ss_key, ws_key)
         sorted_fcs = sorted(meeting_info_dict[proj_name]['flowcells'].keys())
         for fc in sorted_fcs:
             row += 1
             comments_row = row
             # updates flowcell name in column col+1 
-            CLIENT.UpdateCell(row, col+1, fc, ss_key, ws_key)
+            client.UpdateCell(row, col+1, fc, ss_key, ws_key)
             for comment in meeting_info_dict[proj_name]['flowcells'][fc]:
                 # updates comments per flowcell in column col+2 
-                CLIENT.UpdateCell(comments_row, col+2, comment, ss_key, ws_key)
+                client.UpdateCell(comments_row, col+2, comment, ss_key, ws_key)
                 comments_row += 1
             if row != comments_row:
                 row = comments_row - 1
         # adds an empty row after every project
         row += 2
 
-def main(old_wsheet, new_wsheet, file_dump, ssheet_title):
-    ssheet = bcbio.google.spreadsheet.get_spreadsheet(CLIENT, ssheet_title)
+def main(old_wsheet, new_wsheet, file_dump, ssheet_title, client):
+    ssheet = bcbio.google.spreadsheet.get_spreadsheet(client, ssheet_title)
     assert ssheet is not None, "Could not find spreadsheet %s" % ssheet_title
     ss_key = bcbio.google.spreadsheet.get_key(ssheet)
-    dummy, old_wsheet_content = get_ws(old_wsheet, ssheet)
-    new_ws_key, dummy = get_ws(new_wsheet, ssheet)
+    dummy, old_wsheet_content = get_ws(old_wsheet, ssheet, client)
+    new_ws_key, dummy = get_ws(new_wsheet, ssheet, client)
 
     new_wsheet_content = merge_info_from_file_and_wsheet(file_dump, old_wsheet_content)
-    update('ongoing', new_wsheet_content, ss_key, new_ws_key)
-    update('coming' , new_wsheet_content, ss_key, new_ws_key)
+    update('ongoing', new_wsheet_content, ss_key, new_ws_key, client)
+    update('coming' , new_wsheet_content, ss_key, new_ws_key, client)
 
 if __name__ == "__main__":
     parser = OptionParser(usage = """load_meeting_prot.py <Arguments> [Options]
@@ -200,9 +197,16 @@ Arguments:
     parser.add_option("-s", "--ssheet_title", dest="ssheet_title", 
         default = str('Bioinformatics_Meeting_Deliveries_' + str(date.today().year)),
         help = "Name of target spredsheet. Default is Bioinformatics_Meeting_Deliveries_[current year]")
+    parser.add_option("-f", "--credentials_file", dest="credentials_file",
+        default = os.path.join(os.environ['HOME'], 'opt/config/gdocs_credentials'),
+        help = "path to google gdocs_credentials")
     (options, args) = parser.parse_args()
 
     if not args: sys.exit('Missing requiered argument <trello_dump>')
     else: file_dump =  args[0]
-    main(options.old_wsheet, options.new_wsheet, file_dump, options.ssheet_title)
 
+    credentials = bcbio.google.get_credentials({'gdocs_upload': 
+                                {'gdocs_credentials': options.credentials_file}})
+    client = bcbio.google.spreadsheet.get_client(credentials)
+
+    main(options.old_wsheet, options.new_wsheet, file_dump, options.ssheet_title, client)
