@@ -61,6 +61,17 @@ def project_closed(project, format="%Y-%m-%d"):
     except:
         pass
     return date
+
+def project_aborted(project):
+    """ Checks the 'Aborted' udf of lims project. Returns true if it exists
+    """
+    try:
+        is_aborted = True
+        date = project.udf['Aborted']
+    except:
+        is_aborted = False
+    finally:
+        return is_aborted
  
 def lims_project(report, pid):
     """Connect to LIMS and get the a project instance
@@ -124,6 +135,11 @@ def initiate_survey(report, project, **kw):
     if not lproj:
         report.log.error("Could not initiate LIMS object for project {}".format(project))
         return False
+
+    # Check if project is aborted
+    if project_aborted(lproj):
+        report.log.warn("Project {} has been aborted".format(project))
+        return False
         
     # check if project is closed
     closed = project_closed(lproj)
@@ -147,7 +163,7 @@ def initiate_survey(report, project, **kw):
     # verify the format of the email address
     recipients = []
     for email in emails:
-        if email is None or not re.match(r'^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$',email):
+        if email is None or not re.match(r'[^@]+@[^@]+\.[^@]+', email):
             report.log.warn("Illegal email format: {}".format(email))
             continue
         recipients.append(email)

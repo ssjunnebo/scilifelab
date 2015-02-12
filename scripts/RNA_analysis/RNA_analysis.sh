@@ -2,9 +2,10 @@
 #	This script generates some basic statistics and a report for a RNA-seq project
 #	and should be run from the intermediate directory of the project to be analysed.
 
-while getopts ":p:b:g:m:c:e:a:s:d:f:" option; do
+while getopts ":p:o:b:g:m:c:e:a:s:d:f:" option; do
     case ${option} in
-        p) project_id=${OPTARG};;   
+        p) project_id=${OPTARG};;
+        o) order_num=${OPTARG};;   
         b) bedfile=${OPTARG};;
         g) gtf_file=${OPTARG};;
         m) mail=${OPTARG};;
@@ -72,11 +73,11 @@ else
     
     When all the jobbs are finished, start the rest of the pipeline by giving the command:
 
-    sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single
+    sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num
 
     This command is saved in the text file seting_dependensies.txt 
     "
-    echo sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single  >> seting_dependensies.txt
+    echo sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num >> seting_dependensies.txt
 fi
 
-sbatch$dep $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single
+sbatch$dep $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num

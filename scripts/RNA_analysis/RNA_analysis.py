@@ -17,7 +17,8 @@ def find_proj_from_view(proj_db, proj_id):
 
 def main(args,mail,conffile,analysis,stranded,single):
     project = args[0]
-    runs = args[1:]
+    ord_num = args[1]
+    runs = args[2:]
     conf = cl.load_config(conffile)
     port = conf['statusdb']['port']
     username = conf['statusdb']['username']
@@ -34,8 +35,9 @@ def main(args,mail,conffile,analysis,stranded,single):
     gtfpath = RNA_analysis_settings[reference_genome]['gtfpath']
     bedpath = RNA_analysis_settings[reference_genome]['bedpath']
     today = str(datetime.today().isoformat()).replace('-','_').split('.')[0].replace(':','_')
-    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single)] + runs
+    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-o', ord_num, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single)] + runs
     command=' '.join(command)
+    print command
     os.system(command)
 
 
@@ -44,7 +46,7 @@ if __name__ == '__main__':
     usage = """
 Stand in "intermediate" and run:
 
-RNA_analysis.py [options] <project id> <run dir 1> <run dir 2> ... <run dir N>
+RNA_analysis.py [options] <project id> <millions of ordered number of reads> <run dir 1> <run dir 2> ... <run dir N>
 
 Arguments:
     <run dir i>
@@ -62,7 +64,7 @@ Arguments:
 
     parser.add_option('-c', '--config', action="store", dest="conffile", default=os.path.expanduser("~/opt/config/post_process.yaml"),
     help="Specify config file (post_process.yaml)")
-    parser.add_option('-m', '--mail', action="store", dest="mail", default='',
+    parser.add_option('-m', '--mail', action="store", dest="mail", default='jun.wang@scilifelab.se',
     help="Specify a mailing address for SLURM mail notifications")
     parser.add_option('-s', '--stranded', action="store_true", dest="stranded", default="False",
     help="Run tophat with --librarytype fr-firststranded option for strand-specific RNAseq.")

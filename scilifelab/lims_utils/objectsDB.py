@@ -6,72 +6,17 @@ statusdb with lims as the main source of information.
 Maya Brandi, Science for Life Laboratory, Stockholm, Sweden.
 """
 import codecs
-from scilifelab.google import _to_unicode, _from_unicode
-from pprint import pprint
 from genologics.lims import *
 import genologics.entities as gent
-from lims_utils import *
+from genologics.lims_utils import *
+from process_categories import *
 from scilifelab.db.statusDB_utils import *
-from helpers import *
+from functions import *
 import os
 import couchdb
-import bcbio.pipeline.config_utils as cl
 import time
 from datetime import date
 import logging
-
-###  Functions ###
-
-def udf_dict(element, exeptions = [], exclude = True):
-    """Takes a lims element and tertuns a dictionary of its udfs, where the udf 
-    names are trensformed to statusdb keys (underscore and lowercase).
-    
-    exeptions and exclude = False - will return a dict with only the exeptions
-    exeptions and exclude = True - will return a dict without the exeptions  
-
-    Arguments:
-        element     lims element (Sample, Artifact, Process, Project...)
-        exeptions   list of exception udf keys (underscore and lowercase)
-        exlude      (True/False)"""
-
-    udf_dict = {}
-    for key, val in element.udf.items():
-        key = key.replace(' ', '_').lower().replace('.','')
-        try: val = val.isoformat()
-        except: pass
-        if key in exeptions and not exclude:
-            udf_dict[key] = val
-        elif key not in exeptions and exclude:
-            udf_dict[key] = val
-    return udf_dict
-
-def get_last_first(process_list, last=True):
-    returned_process=None
-    for pro in process_list:
-        if (not returned_process) \
-        or (pro.get('date')>returned_process.get('date') and last) \
-        or (pro.get('date')<returned_process.get('date') and not last):
-            returned_process= pro
-    return returned_process
-
-def get_caliper_img(sample_name, caliper_id):
-    caliper_image = None
-    try:
-        last_caliper = Process(lims,id = caliper_id)
-        outarts = last_caliper.all_outputs()
-        for out in outarts:
-            s_names = [p.name for p in out.samples]
-            if (sample_name in s_names and out.type == "ResultFile"):
-                files = out.files
-                for f in files:
-                    if ".png" in f.content_location:
-                        caliper_image = f.content_location
-    except TypeError:
-        #Should happen when no caliper processes are found
-        pass
-    return caliper_image
-
-### Classes  ###
 
 class ProjectDB():
     """Instances of this class holds a dictionary formatted for building up the 
@@ -87,9 +32,27 @@ class ProjectDB():
         self.demux = self.lims.get_processes(projectname = self.project.name,
                                                     type = DEMULTIPLEX.values())
         self.demux_procs = ProcessInfo(self.lims, self.demux)
+        self.seq = self.lims.get_processes(projectname = self.project.name,
+                                                    type = SEQUENCING.values())
+        self.seq_procs = ProcessInfo(self.lims, self.seq)
         self._get_project_level_info()
         self._make_DB_samples()
         self._get_sequencing_finished()
+        self._get_open_escalations()
+
+    def _get_open_escalations(self):
+        escalation_ids=[]
+        processes=self.lims.get_processes(projectname=self.project.name)
+        for p in processes:
+            step=gent.Step(self.lims, id=p.id)
+            if step.actions.escalation:
+                samples_escalated=set()
+                if step.actions.escalation['status'] == "Pending":
+                    shortid=step.id.split("-")[1]
+                    escalation_ids.append(shortid)
+        if escalation_ids:
+            self.obj['escalations']=escalation_ids
+
 
     def _get_project_level_info(self):
         self.obj = {'source' : 'lims',
@@ -118,7 +81,7 @@ class ProjectDB():
         if len(project_summary) > 0:
             self.obj['project_summary'] = udf_dict(project_summary[0])
         if len(project_summary) > 1:
-            print 'Warning. project summary process run more than once'
+            logging.warn('Warning. project summary process run more than once')
 
     def _get_sequencing_finished(self):
         """Finish Date = last seq date if proj closed. Will be removed and 
@@ -141,6 +104,7 @@ class ProjectDB():
         ## Getting sample info
         samples = self.lims.get_samples(projectlimsid = self.project.id)
         self.obj['no_of_samples'] = len(samples)
+        runinfo=self.demux_procs or self.seq_procs 
         if len(samples) > 0:
             procss_per_art = self.build_processes_per_artifact(self.lims,
                                                          self.project.name)
@@ -152,7 +116,7 @@ class ProjectDB():
                                   self.samp_db,
                                   self.obj['application'],
                                   self.preps.info,
-                                  self.demux_procs.info,
+                                  runinfo.info,
                                   processes_per_artifact = procss_per_art)
                 self.obj['samples'][sampDB.name] = sampDB.obj
                 try:
@@ -252,7 +216,7 @@ class SampleDB():
         initqc = InitialQC(self.lims, self.name, self.processes_per_artifact, 
                                                             self.application)
         self.obj['initial_qc'] = initqc.set_initialqc_info()
-        if self.application in ['Finished library', 'Amplicon']:
+        if self.application in ['Finished library', 'Amplicon with adaptors']:
             chategory = INITALQCFINISHEDLIB.values()
         else:
             chategory = INITALQC.values()
@@ -320,7 +284,7 @@ class SampleDB():
                                     pro_per_art = self.processes_per_artifact)
                     steps = ProcessSpec(history.history, history.history_list, 
                                                              self.application)
-                    if self.application in ['Finished library', 'Amplicon']:
+                    if self.application in ['Finished library', 'Amplicon with adaptors']:
                         key = 'Finished'
                     elif steps.preprepstart:
                         key = steps.preprepstart['id']
@@ -332,7 +296,13 @@ class SampleDB():
                         lims_run = Process(lims, id = steps.lastseq['id'])
                         run_dict = dict(lims_run.udf.items())
                         if preps[key].has_key('reagent_label') and run_dict.has_key('Finish Date'):
-                            dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                            try:
+                                dem_art = Artifact(lims, id = steps.latestdem['outart'])
+                                dem_qc=dem_art.qc_flag
+                            except ValueError:
+                                #Miseq projects might not have a demultiplexing step here
+                                #so the artifact id might be None
+                                dem_qc=None
                             seq_art = Artifact(lims, id = steps.lastseq['inart'])
                             lims_run = Process(lims, id = steps.lastseq['id'])
                             samp_run_met_id = self._make_sample_run_id(seq_art, 
@@ -349,7 +319,7 @@ class SampleDB():
                                     'sequencing_start_date' : ssd,
                                     'sequencing_run_QC_finished' : run['start_date'],
                                     'sequencing_finish_date' : sfd,
-                                    'dem_qc_flag' : dem_art.qc_flag,
+                                    'dem_qc_flag' : dem_qc,
                                     'seq_qc_flag' : seq_art.qc_flag}
                                 d = delete_Nones(d)
                                 if not sample_runs.has_key(key):
@@ -498,7 +468,7 @@ class InitialQC():
         outarts = self.lims.get_artifacts(sample_name = self.sample_name,
                                           process_type = AGRINITQC.values())
         if outarts:
-            outart = Artifact(lims, id = max(map(lambda a: a.id, outarts)))
+            outart = Artifact(self.lims, id = max(map(lambda a: a.id, outarts)))
             latestInitQc = outart.parent_process
             inart = latestInitQc.input_per_sample(self.sample_name)[0].id
             history = gent.SampleHistory(sample_name = self.sample_name, 
@@ -525,7 +495,7 @@ class InitialQC():
             if self.steps.latestCaliper:
                 self.initialqc_info['caliper_image'] = get_caliper_img(
                                                                self.sample_name,
-                                                 self.steps.latestCaliper['id'])
+                                           self.steps.latestCaliper['id'], lims)
         return delete_Nones(self.initialqc_info)
 
 
@@ -675,7 +645,7 @@ class Prep():
             'caliper_image' : None}
 
     def set_prep_info(self, steps, aplication):
-        if aplication in ['Amplicon', 'Finished library']:
+        if aplication in ['Amplicon with adaptors', 'Finished library']:
             self.id2AB = 'Finished'
         else:
             if steps.prepstart:
@@ -724,8 +694,8 @@ class Prep():
             if library_validation.has_key("size_(bp)"):
                 average_size_bp = library_validation.pop("size_(bp)")
                 library_validation["average_size_bp"] = average_size_bp
-            if latest_caliper_id:
+            if latest_caliper_id and (Process(lims, id=latest_caliper_id['id'])).date_run >= (Process(lims, id=libvalstart['id']).date_run):
                 library_validation["caliper_image"] = get_caliper_img(self.sample_name,
-                                                            latest_caliper_id['id'])
+                                                        latest_caliper_id['id'], lims)
             library_validations[agrlibQCstep['id']] = delete_Nones(library_validation)
         return delete_Nones(library_validations) 

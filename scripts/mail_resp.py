@@ -13,25 +13,32 @@ sixMonthsAgo=date.today()-timedelta(weeks=26);
 yesterday=date.today()-timedelta(days=1)
 pjs=lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
 
+operator="denis.moreno@scilifelab.se"
 summary={}
-email={u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
-        u'Chuan Wang':'chuan.wang@scilifelab.se',
-        u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
+email={u'Anna Konrad':'anna.konrad@scilifelab.se',
+        u'Bahram Amini':'bahram.amini@scilifelab.se',
         u'Britta Lotstedt':'britta.lotstedt@scilifelab.se',
-        u'Joel Gruselius':'joel.gruselius@scilifelab.se',
-        u'Par Lundin':'par.lundin@scilifelab.se',
-        u'Nemanja Rilakovic':'nemanja.rilakovic@scilifelab.se',
-        u'Senthilkumar Paneerselvam':'senthilkumar.paneerselvam@scilifelab.se',
         u'Carolina Bonilla':'carolina.bonilla@scilifelab.se',
+        u'Chuan Wang':'chuan.wang@scilifelab.se',
+        u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
+        u'Francesco Vezzi':'francesco.vezzi@scilifelab.se',
         u'Helena Samuelsson':'helena.samuelsson@scilifelab.se',
+        u'Helena Zajac':'helena.zajac@scilifelab.se',
+        u'Joel Gruselius':'joel.gruselius@scilifelab.se',
+        u'Jun Wang':'jun.wang@scilifelab.se',
+        u'Lina Sylwan':'lina.sylwan@scilifelab.se',
         u'Mario Giovacchini':'mario.giovacchini@scilifelab.se',
         u'Marianna Sjogren':'marianna.sjogren@scilifelab.se',
-        u'Jun Wang':'jun.wang@scilifelab.se',
-        u'Bahram Amini':'bahram.amini@scilifelab.se',
-        u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
-        u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se'
+        u'Nemanja Rilakovic':'nemanja.rilakovic@scilifelab.se',
+        u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se',
+        u'Par Lundin':'par.lundin@scilifelab.se',
+        u'Phil Ewels':'phil.ewels@scilifelab.se',
+        u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
+        u'Senthilkumar Paneerselvam':'senthilkumar.panneerselvam@scilifelab.se',
+        u'Simone Picelli':'simone.picelli@scilifelab.se'
         }
-project_types=['Illumina Sequencing (Illumina SBS) 4.0', 'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
+project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
+'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
 
 def clean_names(name):
     return name.replace(u"\u00f6", "o").replace(u"\u00e9", "e").replace(u"\u00e4", "a")
@@ -106,15 +113,18 @@ for resp in summary:
         elif struct['sum']:
             plist.add(struct['project'])
             body+='Project {} {} on {} by {}\n'.format(struct['project'], struct['action'],struct['date'],struct['techID'])
-    #print "TO " +email[resp]
-    #print " ".join(plist)
-    #print body
+    body+='\n\n--\nThis mail is an automated mail that is generated once a day and summarizes the events of the previous days in the lims, \
+for the projects you are described as "Lab responsible" or "Bioinfo Responsible". You can send comments or suggestions to denis.moreno@scilifelab.se.'
     if body!= '':
         msg=MIMEText(body)
         msg['Subject']='[Lims update] {}'.format(" ".join(plist))
         msg['From']='Lims_monitor'
-        msg['To'] =email[resp]
+        try:
+            msg['To'] =email[resp]
+        except KeyError:
+            msg['To'] = operator
+            msg['Subject']='[Lims update] Failed to send a mail to {}'.format(resp)
+
         s = smtplib.SMTP('smtp.ki.se')
-        print msg
-        #s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
+        s.sendmail('genologics-lims@scilifelab.se', msg['To'], msg.as_string())
         s.quit()
