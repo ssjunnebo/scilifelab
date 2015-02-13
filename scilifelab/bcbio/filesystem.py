@@ -7,28 +7,29 @@ import datetime
 import csv
 from  dateutil  import  parser
 
-def fastq_screen_finished(fastq_screen_dir):
+def fastq_screen_finished(fastq_screen_dir,check_png=False):
     """Determine if the finished output from fastq_screen exists
     """
     pattern = os.path.join(fastq_screen_dir,"*_screen.txt")
     tfiles = glob.glob(pattern)
     if len(tfiles) == 0:
         return False
-    
+
     for tf in tfiles:
-        # Check that a corresponding png outfile exists
-        if not os.path.exists("{}.png".format(os.path.splitext(tf)[0])):
-            return False
-        
+        # Check that a corresponding png outfile exists if required
+        if check_png:
+            if not os.path.exists("{}.png".format(os.path.splitext(tf)[0])):
+                return False
+
         # Check that output exists beyond the header row
         rows = 0
         with open(tf) as fh:
             for row in fh:
                 rows += 1
-        
+
         if rows <= 1:
             return False
-    
+
     return True
 
 def get_fastq_screen_folder(analysis_dir):
@@ -45,7 +46,7 @@ def get_flowcelldirs(archive_dir, flowcell_id="CXX"):
         if not os.path.isdir(d):
             continue
         matches.append(d)
-        
+
     return matches
 
 def get_most_recent_indicator(ifiles):
@@ -61,7 +62,7 @@ def get_most_recent_indicator(ifiles):
                         most_recent = (time,ifile)
                 except ValueError:
                     # If we cannot parse time stamp, we may have grabbed some non-relevant file, in which case we'll break
-                    break 
+                    break
     return most_recent
 
 def get_project_analysis_dir(analysis_dir, project):
@@ -98,7 +99,7 @@ def get_pipeline_indicator(sample_dir, steps=[]):
     for step in steps:
         pattern = os.path.join(sample_dir,"{s:02d}_*.txt".format(s=step))
         ifiles += [f for f in glob.glob(pattern) if os.path.isfile(f)]
-    
+
     # Make sure that the located files are indicator files
     return [ifile for ifile in ifiles if _is_indicator(ifile)]
 
@@ -116,4 +117,4 @@ def _is_indicator(fname):
     except:
         return False
     return True
-    
+
