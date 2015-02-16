@@ -36,6 +36,7 @@ email={u'Anna Konrad':'anna.konrad@scilifelab.se',
         u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
         u'Senthilkumar Paneerselvam':'senthilkumar.panneerselvam@scilifelab.se',
         u'Simone Picelli':'simone.picelli@scilifelab.se'
+        u'Sverker Lundin':'sverker.lundin@scilifelab.se'
         }
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
 'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
