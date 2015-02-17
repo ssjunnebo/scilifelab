@@ -89,13 +89,6 @@ class Workset:
         self.obj['technician']=crawler.starting_proc.technician.initials
         self.obj['id']=crawler.starting_proc.id
         self.obj['date_run']=crawler.starting_proc.date_run
-        self.obj['workset_notes']={}
-        if "Workset Notes" in crawler.starting_proc.udf:
-            notes=json.loads(crawler.starting_proc.udf["Workset Notes"])
-            for date, note in notes:
-                pass
-
-
         pjs = {}
         for p in crawler.projects:
             pjs[p.id] = {}
