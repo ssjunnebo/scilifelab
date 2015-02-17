@@ -12,7 +12,6 @@ import multiprocessing as mp
 import Queue
 import logging
 import logging.handlers
-import json
 
 def setupLog(args):
     mainlog = logging.getLogger('worksetlogger')
