@@ -40,6 +40,7 @@ PREPSTART = {'Description':'Process/processes that can be defined as a start of 
     '407' : 'Fragment DNA (ThruPlex)',
     '308': 'Library Pooling (TruSeq Small RNA) 1.0',
     '117' : 'Applications Generic Process',
+    '454' : 'ThruPlex template preparation and synthesis',
     '405' : 'RiboZero depletion'}
 PREPEND = {'Description':'Process that can be defined as a end of the library preparation. If more than one library preparation protocol is included in the work flow, only the prep end step of the second protocol should be given here. Used to set the prep finished date.',
     '157': 'Applications Finish Prep',
