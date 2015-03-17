@@ -35,7 +35,7 @@ email={u'Anna Konrad':'anna.konrad@scilifelab.se',
         u'Phil Ewels':'phil.ewels@scilifelab.se',
         u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
         u'Senthilkumar Paneerselvam':'senthilkumar.panneerselvam@scilifelab.se',
-        u'Simone Picelli':'simone.picelli@scilifelab.se'
+        u'Simone Picelli':'simone.picelli@scilifelab.se',
         u'Sverker Lundin':'sverker.lundin@scilifelab.se'
         }
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
