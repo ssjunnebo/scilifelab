@@ -103,6 +103,8 @@ def project_note_paragraphs():
     paragraphs["UPPNEX project id"] = dict(style=h3, tpl=Template("${uppnex_project_id}"))
 
     paragraphs["Sequence data directories"] = dict(style=h3, tpl=Template("/proj/${uppnex_project_id}/INBOX/${project_name}/"))
+    
+    paragraphs["Flowcells Delivered"] = dict(style=h3, tpl=Template("${flowcells_run}"))
 
     paragraphs["Samples"] = dict(style=h3, tpl=Template(""))
 
