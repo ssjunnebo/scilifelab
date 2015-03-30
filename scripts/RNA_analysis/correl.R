@@ -90,8 +90,8 @@ for (name in snames) {
 
 # write a more user friendly version file 
 d.0 <- data.frame(e)
-d.1 <- cbind(Transcript_ID=temp[o,5], d.0)
-d.2 <- cbind(ENSEMBL_ID=temp[o,1],d.1)
+d.1 <- cbind(Gene_ID=temp[o,4], d.0)
+d.2 <- cbind(Transcript_ID=temp[o,1],d.1)
 
 write.table(d.2, file="isoform_fpkm_table.txt", quote=F, row.names=F, sep="\t")
 

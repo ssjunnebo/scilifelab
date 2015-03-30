@@ -15,7 +15,9 @@ from mako.template import Template
 from mako.lookup import TemplateLookup
 from texttable import Texttable
 from bcbio.pipeline.config_loader import load_config
-from scilifelab.google.project_metadata import ProjectMetaData
+from scilifelab.db.statusDB_utils import load_couch_server
+from scilifelab.db.statusDB_utils import find_proj_from_view
+
 #from scilifelab.report.rst import make_logo_table
 import operator
 
@@ -363,18 +365,30 @@ def generate_report(proj_conf,single_end,stranded):
     d['latex_opt'] = floats_per_page
 
 
-    ## Metadata fetched from the 'Genomics project list' on Google Docs
+    ## Project information fetched from StatusDB
+    couch=load_couch_server('/home/funk_001/opt/config/post_process.yaml')
+    proj_db = couch['projects']
+    key = find_proj_from_view(proj_db, proj_conf['id'])
+    info = proj_db[key]
     try:
-        proj_data = ProjectMetaData(proj_conf['id'], proj_conf['config'])
-        uppnex_proj = proj_data.uppnex_id
-        if proj_data.ref_genome == "hg19":
+        uppnex_proj = info['uppnex_id']
+	reference_genome=info['reference_genome']
+        if reference_genome == "hg19":
             d['species'] = 'Human'
-        elif proj_data.ref_genome == "mm9":
+        elif reference_genome == "mm9":
             d['species'] = 'Mouse'
+	elif reference_genome == "rn4":
+	    d['species'] = 'Rat'
+	elif reference_genome == "Zv9":
+            d['species'] = 'Zebrafish'
+	elif reference_genome == "sacCer2":
+            d['species'] = 'Saccharomyces cerevisiae'
+        elif reference_genome == "dm3":
+            d['species'] = 'Drosophila melanogaster'
         else:
-            d['species'] = proj_data.ref_genome
+            d['species'] = reference_genome
     except:
-        uppnex_proj = "b201YYXX"
+        uppnex_proj = ""
         print "No uppnex ID fetched"
         pass
     d['uppnex'] = uppnex_proj
@@ -387,10 +401,10 @@ def generate_report(proj_conf,single_end,stranded):
         d['dup_rem'] = os.path.join(tools['dup_remover'],tools['dup_remover_version'])
         d['read_count'] = os.path.join(tools['counts'],tools['counts_version'])
         d['quantifyer'] = os.path.join(tools['quantifyer'],tools['quantifyer_version'])
-        d['genombuild'] = tools[proj_data.ref_genome]['name']
+        d['genombuild'] = tools[reference_genome]['name']
         d['rseqc_version'] = tools['rseqc_version']
         d['Preseq'] = tools['preseq']
-        d['anotation_version'] = tools[proj_data.ref_genome]['annotation_release']
+        d['anotation_version'] = tools[reference_genome]['annotation_release']
     except:
         print "Could not fetched RNA-seq tools from config file post_process.yaml"
         pass
