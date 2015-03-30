@@ -31,7 +31,8 @@ POOLING = {'Description':'To identify the reagent labels (indexes) of each sampl
     '308': "Library Pooling (TruSeq Small RNA) 1.0",
     '404': "Pre-Pooling (Illumina SBS) 4.0",
     '506': "Pre-Pooling (MiSeq) 4.0",
-    '508': "Applications Pre-Pooling"}
+    '508': "Applications Pre-Pooling",
+    '716': 'Library Pooling (HiSeq X) 1.0'}
 PREPSTART = {'Description':'Process/processes that can be defined as a start of the library preparation protocol. The first one of these that are run in lims is used to set the prep start date. If the work flow involves two library preparation protocols, such as for exome capture, the prep start step of the second protocol should be given here. ',
     '10' : 'Aliquot Libraries for Hybridization (SS XT)',
     '47' : 'mRNA Purification, Fragmentation & cDNA synthesis (TruSeq RNA) 4.0',
@@ -39,6 +40,7 @@ PREPSTART = {'Description':'Process/processes that can be defined as a start of 
     '407' : 'Fragment DNA (ThruPlex)',
     '308': 'Library Pooling (TruSeq Small RNA) 1.0',
     '117' : 'Applications Generic Process',
+    '454' : 'ThruPlex template preparation and synthesis',
     '405' : 'RiboZero depletion'}
 PREPEND = {'Description':'Process that can be defined as a end of the library preparation. If more than one library preparation protocol is included in the work flow, only the prep end step of the second protocol should be given here. Used to set the prep finished date.',
     '157': 'Applications Finish Prep',
@@ -64,13 +66,16 @@ AGRLIBVAL = {'Description':'The aggregation step of the library validation proto
     '8': 'Aggregate QC (Library Validation) 4.0'}
 SEQSTART = {'Description':'These processes are used to set the sequencing_start_date',
     '23':'Cluster Generation (Illumina SBS) 4.0',
-    '26':'Denature, Dilute and Load Sample (MiSeq) 4.0'}
+    '26':'Denature, Dilute and Load Sample (MiSeq) 4.0',
+    '710':'Cluster Generation (HiSeq X) 1.0'}
 DILSTART = {'Description':'These processes are used to set the dilution_and_pooling_start_date',
     '40' : 'Library Normalization (MiSeq) 4.0',
-    '39' : 'Library Normalization (Illumina SBS) 4.0'}
+    '39' : 'Library Normalization (Illumina SBS) 4.0',
+    '715': 'Library Normalization (HiSeq X) 1.0'}
 SEQUENCING = {'Description':'Sequencing',
     '38' : 'Illumina Sequencing (Illumina SBS) 4.0',
-    '46' : 'MiSeq Run (MiSeq) 4.0'}
+    '46' : 'MiSeq Run (MiSeq) 4.0',
+    '714': 'Illumina Sequencing (HiSeq X) 1.0'}
 WORKSET = {'Description':'To identify the work sets on which the samples has been run. The process used to define a workset for the protocol. ',
     '204' : 'Setup Workset/Plate'}
 SUMMARY = {'Description':'',

@@ -35,7 +35,6 @@ setup(name = "scilifelab",
     license = "MIT",
     scripts = scripts,
     install_requires = [
-        "bcbio-nextgen >= 0.2",
         "drmaa >= 0.5",
         "sphinx >= 1.1.3",
         "couchdb >= 0.8",

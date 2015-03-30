@@ -369,7 +369,7 @@ class DeliveryController(AbstractBaseController):
                 return
             return re.search(pattern, f) != None
         # Setup pattern
-        plist = [".*.yaml$", ".*.metrics$"]
+        plist = [".*.metrics$"]
         if not self.pargs.no_bam:
             plist.append(".*-{}.bam$".format(self.pargs.bam_file_type))
             plist.append(".*-{}.bam.bai$".format(self.pargs.bam_file_type))
