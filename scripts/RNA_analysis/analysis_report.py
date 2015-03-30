@@ -333,7 +333,7 @@ http://smithlabresearch.org/software/preseq/
     return TEMPLATE
 
 
-def generate_report(proj_conf,single_end,stranded):
+def generate_report(config_file,proj_conf,single_end,stranded):
 
     d = {
         'project_id': proj_conf['id'],
@@ -366,7 +366,7 @@ def generate_report(proj_conf,single_end,stranded):
 
 
     ## Project information fetched from StatusDB
-    couch=load_couch_server('/home/funk_001/opt/config/post_process.yaml')
+    couch=load_couch_server(config_file)
     proj_db = couch['projects']
     key = find_proj_from_view(proj_db, proj_conf['id'])
     info = proj_db[key]
@@ -379,7 +379,7 @@ def generate_report(proj_conf,single_end,stranded):
             d['species'] = 'Mouse'
 	elif reference_genome == "rn4":
 	    d['species'] = 'Rat'
-	elif reference_genome == "Zv9":
+	elif reference_genome == ("Zv9" or "Zv8"):
             d['species'] = 'Zebrafish'
 	elif reference_genome == "sacCer2":
             d['species'] = 'Saccharomyces cerevisiae'
@@ -629,7 +629,7 @@ def main(project_id,sample_names,single_end,config_file,Map_Stat,Read_Dist,FPKM,
         'config' : config,
         'samples': sample_names
          }
-    d = generate_report(proj_conf,single_end,stranded)
+    d = generate_report(config_file, proj_conf,single_end,stranded)
     rstfile = "%s_analysis_report.rst" % (project_id)
     fp = open(rstfile, "w")
     fp.write(tmpl.render(**d))
