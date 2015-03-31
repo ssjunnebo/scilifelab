@@ -73,11 +73,11 @@ else
     
     When all the jobbs are finished, start the rest of the pipeline by giving the command:
 
-    sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num
+    sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single
 
     This command is saved in the text file seting_dependensies.txt 
     "
-    echo sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num >> seting_dependensies.txt
+    echo sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single >> seting_dependensies.txt
 fi
 
-sbatch$dep $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $single $order_num
+sbatch$dep $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single

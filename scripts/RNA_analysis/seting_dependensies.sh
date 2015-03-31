@@ -21,8 +21,8 @@ path=$6
 gtf_file=$7
 WP=$8
 mail=$9
-single=${10}
-order_num=${11}
+order_num=${10}
+single=${11}
 name_list=(`echo $names | tr "," "\n"`)
 
 cd $path
