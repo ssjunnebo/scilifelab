@@ -646,6 +646,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
     # Get sample run list and loop samples to make mapping sample -> {sampleruns}
     sample_run_list = _set_sample_run_list(project_name, flowcell=None, project_alias=project_alias, s_con=s_con)
     samples = {}
+    flowcells_run = []
     for s in sample_run_list:
         prj_sample = p_con.get_project_sample(project_name, s.get("project_sample_name", None))
         if prj_sample:
@@ -659,6 +660,13 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
             else:
                 s_d = {s["name"]:{'sample':s["name"], 'id':s["_id"], 'barcode_name':s["barcode_name"]}}
                 LOG.warn("No mapping found for sample run:\n  '{}'".format(s_d))
+        # collect flowcell that have been sequenced for this project
+        fc_id = "{}_{}".format(s.get('date'),s.get('flowcell'))
+        if fc_id not in flowcells_run:
+            flowcells_run.append(fc_id)
+    
+    # reformat list of flowcell as one string to be put in report
+    param["flowcells_run"] = ", ".join(flowcells_run)
 
     # Convert to mapping from desired sample name to list of aliases
     # Less important for the moment; one solution is to update the
