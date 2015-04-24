@@ -208,7 +208,7 @@ if __name__ == '__main__':
     parser.add_option('-r', '--stranded', action="store_true", dest="stranded", default="False",
     help="Run tophat with --librarytype fr-firststranded option for strand-specific RNAseq.")
     parser.add_option('-g', '--genome', action="store", dest="genome", default=None,
-    help="Reference genome, if mentioned here not fetched from status DB")
+    help="Reference genome name (eg. 'GRCh37') Default: fetch from status DB")
 
     (opts, args)    = parser.parse_args()
     main(args,opts.phred64,opts.fai,opts.projtag,opts.mail,opts.hours,opts.conffile,opts.fpath,opts.single,opts.stranded,opts.genome)
