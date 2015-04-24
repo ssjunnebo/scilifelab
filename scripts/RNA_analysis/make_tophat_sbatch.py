@@ -144,7 +144,7 @@ mv accepted_hits.bam accepted_hits_"""+samp+""".bam
 """+make_fai
     f.close()
 
-def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded):
+def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded,genome):
     proj_ID = args[0]
     flow_cell = args[1]
     if phred64 == True:
@@ -167,7 +167,7 @@ def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded):
     except:
         sys.exit("project "+proj_ID+" not found in statusdb")
 
-    reference_genome = info['reference_genome']
+    reference_genome = genome if genome else info['reference_genome']
     RNA_analysis_settings = conf['custom_algorithms']['RNA-seq analysis']
     refpath = RNA_analysis_settings[reference_genome]['genomepath']
     aligner_version = RNA_analysis_settings['aligner_version']
@@ -189,24 +189,26 @@ if __name__ == '__main__':
     usage = """make_tophat_sbatch.py <project ID> <Flow cell ID, eg 121113_BD1HG4ACXX>"""
     parser = optparse.OptionParser(usage)
 
-    parser.add_option('-s', '--single', action="store_true", dest="single", default="False",     
-    help="Run tophat with single end reads.")    
-    parser.add_option('-c', '--config', action="store", dest="conffile", default=os.path.expanduser("~/opt/config/post_process.yaml"),    
-    help="Specify config file (post_process.yaml)")    
-    parser.add_option('-t', '--projtag', action="store", dest="projtag", default="",     
-    help="Provide a project tag that will be shown in the queuing system to distinguish from other TopHat runs")    
-    parser.add_option('-p', '--phred64', action="store_true", dest="phred64", default="False", 
-    help="Use phred64 quality scale")    
-    parser.add_option('-f', '--fai', action="store", dest="fai", default="",     
+    parser.add_option('-s', '--single', action="store_true", dest="single", default="False",
+    help="Run tophat with single end reads.")
+    parser.add_option('-c', '--config', action="store", dest="conffile", default=os.path.expanduser("~/opt/config/post_process.yaml"),
+    help="Specify config file (post_process.yaml)")
+    parser.add_option('-t', '--projtag', action="store", dest="projtag", default="",
+    help="Provide a project tag that will be shown in the queuing system to distinguish from other TopHat runs")
+    parser.add_option('-p', '--phred64', action="store_true", dest="phred64", default="False",
+    help="Use phred64 quality scale")
+    parser.add_option('-f', '--fai', action="store", dest="fai", default="",
     help="Provide FASTA index file for generating UCSC bigwig tracks")
-    parser.add_option('-m', '--mail', action="store", dest="mail", default=None,    
+    parser.add_option('-m', '--mail', action="store", dest="mail", default=None,
     help="Specify a mailing address for SLURM mail notifications")
-    parser.add_option('-a', '--alloc-time', action="store", dest="hours", default="40:00:00",     
+    parser.add_option('-a', '--alloc-time', action="store", dest="hours", default="40:00:00",
     help="Time to allocate in SLURM. Please specify as hours:minutes:seconds or days-hours:minutes:seconds")
-    parser.add_option('-w', '--fpath', dest="fpath", default=False,     
+    parser.add_option('-w', '--fpath', dest="fpath", default=False,
     help="Path to fastq files. If not given, the script assumes the standars structure of the analysis directory'")
-    parser.add_option('-r', '--stranded', action="store_true", dest="stranded", default="False",     
+    parser.add_option('-r', '--stranded', action="store_true", dest="stranded", default="False",
     help="Run tophat with --librarytype fr-firststranded option for strand-specific RNAseq.")
+    parser.add_option('-g', '--genome', action="store", dest="genome", default=None,
+    help="Reference genome name (eg. 'GRCh37') Default: fetch from status DB")
 
     (opts, args)    = parser.parse_args()
-    main(args,opts.phred64,opts.fai,opts.projtag,opts.mail,opts.hours,opts.conffile,opts.fpath,opts.single,opts.stranded)
+    main(args,opts.phred64,opts.fai,opts.projtag,opts.mail,opts.hours,opts.conffile,opts.fpath,opts.single,opts.stranded,opts.genome)
