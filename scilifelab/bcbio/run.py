@@ -15,20 +15,20 @@ from scilifelab.bcbio.flowcell import Flowcell
 
 LOG = minimal_logger(__name__)
 
-# The analysis script for running the pipeline in parallell mode (on one node)  
+# The analysis script for running the pipeline in parallell mode (on one node)
 PARALLELL_ANALYSIS_SCRIPT="automated_initial_analysis.py"
 # The analysis script for running the pipeline in distributed mode (across multiple nodes/cores)
 DISTRIBUTED_ANALYSIS_SCRIPT="distributed_nextgen_pipeline.py"
 # If True, will sanitize the run_info.yaml configuration file when running non-CASAVA analysis
 PROCESS_YAML = True
-# If True, will assign the distributed master process and workers to a separate RabbitMQ queue for each flowcell 
+# If True, will assign the distributed master process and workers to a separate RabbitMQ queue for each flowcell
 FC_SPECIFIC_AMPQ = True
 ## Name of merged sample output directory
 MERGED_SAMPLE_OUTPUT_DIR = "TOTAL"
 
 def _sample_status(x):
     """Find the status of a sample.
-    
+
     Look for output files: currently only look for project-summary.csv"""
     if os.path.exists(os.path.join(os.path.dirname(x), "project-summary.csv")):
         return "PASS"
@@ -37,7 +37,7 @@ def _sample_status(x):
 
 def _group_samples(flist, include_merged=False):
     """Group samples by sample name and flowcell
-    
+
     This function assumes flist consists of bcbb-config.yaml files. It reads each file
     and extracts sample name and flowcell for subsequent grouping. Exclude MERGED_SAMPLE_OUTPUT_DIR from grouping.
 
@@ -102,7 +102,7 @@ def sample_table(flist):
                 fc_date = conf.get("fc_date", None)
                 samples.append([sample, lane, barcode_id, fc_name, fc_date, path])
     return pd.DataFrame(samples, columns=["sample", "lane", "barcode_id", "fc_name", "fc_date", "path"])
-                                  
+
 def get_vcf_files(flist, vcfext="sort-gatkrecal-realign-variants-combined-phased-annotated", **kw):
     """Get dictionary of vcf files.
 
@@ -145,7 +145,7 @@ def setup_merged_samples(flist, sample_group_fn=_group_samples, **kw):
     new_flist = []
     sample_d = sample_group_fn(flist)
     for k, v in sample_d.iteritems():
-        if len(v) > 1:
+        if len(v) >= 1:
             f = v[v.keys()[0]]
             out_d = os.path.join(os.path.dirname(os.path.dirname(f)), MERGED_SAMPLE_OUTPUT_DIR)
             LOG.info("Sample {} has {} sample runs; setting up merge analysis in {}".format(k, len(v), out_d))
@@ -193,7 +193,7 @@ def samplesheet_csv_to_yaml(fn):
     outfile = os.path.join(os.path.dirname(fn), "{}-bcbb-config.yaml".format(name))
     with open(outfile, "w") as fh:
         fh.write(fc.as_yaml())
-            
+
 def validate_sample_directories(flist, pdir):
     """Validate that config files in flist are indeed in subdirectories of pdir.
 
@@ -346,16 +346,16 @@ def remove_files(f, **kw):
 
 def run_bcbb_command(run_info, post_process=None, **kw):
     """Setup bcbb command to run
-    
-    :param run_info: run info file 
+
+    :param run_info: run info file
     :param post_process: post process file
     :param kw: keyword arguments
-    
+
     :returns: command line to run
     """
     global_post_process = True
     if run_info.endswith("-bcbb-config.yaml"):
-        run_info_base = run_info.replace("-bcbb-config.yaml", "") 
+        run_info_base = run_info.replace("-bcbb-config.yaml", "")
     else:
         run_info_base, _ = os.path.splitext(run_info)
     if not post_process:
