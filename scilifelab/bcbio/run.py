@@ -145,7 +145,7 @@ def setup_merged_samples(flist, sample_group_fn=_group_samples, **kw):
     new_flist = []
     sample_d = sample_group_fn(flist)
     for k, v in sample_d.iteritems():
-        if len(v) >= 1:
+        if len(v):
             f = v[v.keys()[0]]
             out_d = os.path.join(os.path.dirname(os.path.dirname(f)), MERGED_SAMPLE_OUTPUT_DIR)
             LOG.info("Sample {} has {} sample runs; setting up merge analysis in {}".format(k, len(v), out_d))
