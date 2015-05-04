@@ -206,10 +206,32 @@ def _set_project_sample_dict(project_sample_item, source):
     return project_sample_d
 
 
+def _exclude_sample_id(exclude_sample_ids, sample_name, barcode_seq):
+    """Check whether we should exclude a sample id.
+
+    :param exclude_sample_ids: dictionary of sample:barcode pairs
+    :param sample_name: project sample name
+    :param barcode_seq: the barcode sequence
+
+    :returns: True if exclude, False otherwise
+    """
+    if exclude_sample_ids and sample_name in exclude_sample_ids.keys():
+        if exclude_sample_ids[sample_name]:
+            if barcode_seq in exclude_sample_ids[sample_name]:
+                LOG.info("excluding sample '{}' with barcode '{}' from report".format(sample_name, barcode_seq))
+                return True
+            else:
+                LOG.info("keeping sample '{}' with barcode '{}' in report".format(sample_name, barcode_seq))
+                return False
+        else:
+            LOG.info("excluding sample '{}' from report".format(sample_name))
+            return True
+
+
 def sample_status_note(project_name=None, flowcell=None, username=None, password=None, url=None,
                        ordered_million_reads=None, uppnex_id=None, customer_reference=None, bc_count=None,
                        project_alias=[], projectdb="projects", samplesdb="samples", flowcelldb="flowcells",
-                       phix=None, is_paired=True, **kw):
+                       phix=None, is_paired=True, exclude_sample_ids={}, **kw):
     """Make a sample status note. Used keywords:
 
     :param project_name: project name
@@ -251,6 +273,7 @@ def sample_status_note(project_name=None, flowcell=None, username=None, password
     srm_to_parameter = {"project_name":"sample_prj", "FC_id":"flowcell",
                         "scilifelab_name":"barcode_name", "start_date":"date",
                         "rounded_read_count":"bc_count", "lane": "lane"}
+    exclude_sample_ids = _literal_eval_option(exclude_sample_ids, default={})
 
     LOG.debug("got parameters {}".format(parameters))
     output_data = {'stdout':StringIO(), 'stderr':StringIO(), 'debug':StringIO()}
@@ -293,6 +316,8 @@ def sample_status_note(project_name=None, flowcell=None, username=None, password
     s_param_out = []
     fcdoc = None
     for s in sample_run_list:
+        if _exclude_sample_id(exclude_sample_ids, s.get("barcode_name"), s.get("sequence")):
+            continue
         s_param = {}
         LOG.debug("working on sample '{}', sample run metrics name '{}', id '{}'".format(s.get("barcode_name", None), s.get("name", None), s.get("_id", None)))
         s_param.update(parameters)
@@ -411,28 +436,6 @@ def sample_status_note(project_name=None, flowcell=None, username=None, password
     rest_notes = make_sample_rest_notes("{}_{}_{}_sample_summary.rst".format(project_name, s.get("date", None), s.get("flowcell", None)), s_param_out)
     concatenate_notes(notes, "{}_{}_{}_sample_summary.pdf".format(project_name, s.get("date", None), s.get("flowcell", None)))
     return output_data
-
-
-def _exclude_sample_id(exclude_sample_ids, sample_name, barcode_seq):
-    """Check whether we should exclude a sample id.
-
-    :param exclude_sample_ids: dictionary of sample:barcode pairs
-    :param sample_name: project sample name
-    :param barcode_seq: the barcode sequence
-
-    :returns: True if exclude, False otherwise
-    """
-    if exclude_sample_ids and sample_name in exclude_sample_ids.keys():
-        if exclude_sample_ids[sample_name]:
-            if barcode_seq in exclude_sample_ids[sample_name]:
-                LOG.info("excluding sample '{}' with barcode '{}' from project report".format(sample_name, barcode_seq))
-                return True
-            else:
-                LOG.info("keeping sample '{}' with barcode '{}' in sequence report".format(sample_name, barcode_seq))
-                return False
-        else:
-            LOG.info("excluding sample '{}' from project report".format(sample_name))
-            return True
 
 
 def _set_sample_table_values(sample_name, project_sample, barcode_seq, ordered_million_reads, param):
@@ -664,7 +667,7 @@ def _project_status_note_table(project_name=None, username=None, password=None, 
         fc_id = "{}_{}".format(s.get('date'),s.get('flowcell'))
         if fc_id not in flowcells_run:
             flowcells_run.append(fc_id)
-    
+
     # reformat list of flowcell as one string to be put in report
     param["flowcells_run"] = ", ".join(flowcells_run)
 
