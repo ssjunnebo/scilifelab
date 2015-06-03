@@ -118,7 +118,7 @@ class PSUL():
                 info = self.print_couchdb_obj_to_file(project.obj)
             return "project {name} is handled and {info}: _id = {id}".format(
                                name=self.name, info=info, id=project.obj['_id'])
-        except:
+        except IOError:
             return ('Issues geting info for {name}. The "Application" udf might'
                                          ' be missing'.format(name = self.name))
 
