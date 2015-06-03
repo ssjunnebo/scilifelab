@@ -26,6 +26,11 @@ Sequence data directories
 
 /proj/${uppnex_project_id}/INBOX/${project_name}
 
+Flowcells Delivered
+^^^^^^^^^^^^^^^^^^^
+
+${flowcells_run}
+
 Samples
 ^^^^^^^
 
