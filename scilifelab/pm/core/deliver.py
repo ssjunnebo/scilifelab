@@ -129,7 +129,7 @@ class DeliveryController(AbstractBaseController):
         # Deliver only mentioned samples if any
         if self.pargs.sample:
             samples = [sample_obj for sample_obj in samples if sample_obj.get('project_sample_name','NA') == self.pargs.sample]
-            if len(samples) == 0:
+            if not samples:
                 self.log.error("There is no such sample {} for project {}".format(self.pargs.sample, self.pargs.project))
                 return
 
