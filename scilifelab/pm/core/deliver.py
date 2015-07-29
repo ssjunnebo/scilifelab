@@ -126,6 +126,13 @@ class DeliveryController(AbstractBaseController):
         # Extract the list of samples and runs associated with the project and sort them
         samples = sorted(s_con.get_samples(fc_id=self.pargs.flowcell, sample_prj=self.pargs.project), key=lambda k: (k.get('project_sample_name','NA'), k.get('flowcell','NA'), k.get('lane','NA')))
 
+        # Deliver only mentioned samples if any
+        if self.pargs.sample:
+            samples = [sample_obj for sample_obj in samples if sample_obj.get('project_sample_name','NA') == self.pargs.sample]
+            if len(samples) == 0:
+                self.log.error("There is no such sample {} for project {}".format(self.pargs.sample, self.pargs.project))
+                return
+
         # Setup paths and verify parameters
         self._meta.production_root = self.app.config.get("production", "root")
         self._meta.root_path = self._meta.production_root
