@@ -2,32 +2,20 @@
 using 'uquota'. If a couchdb is specified, the dictionaries will be sent there.
 Otherwise prints the dictionaries.
 """
-import argparse
 import datetime
 import subprocess
-from platform import node as host_name
-from pprint import pprint
 import couchdb
+import yaml
 
-def main():
-    parser = argparse.ArgumentParser(description="Formats uquota \
-        information as a dict, and sends it to a given CouchDB.")
-
-    parser.add_argument("--server", dest="server", action="store", default="", \
-        help="Address to the CouchDB server.")
-
-    parser.add_argument("--db", dest="db", action="store", \
-        help="Name of the CouchDB database")
-
-    args = parser.parse_args()
-
+def disk_quota():
     current_time = datetime.datetime.now()
     uq = subprocess.Popen(["/bubo/sw/uppmax/bin/uquota", "-q"], stdout=subprocess.PIPE)
+
     output = uq.communicate()[0]
 
     projects = output.split("\n/proj/")[1:]
 
-    project_list = []
+    result = {}
     for proj in projects:
         project_dict = {"time": current_time.isoformat()}
 
@@ -40,15 +28,71 @@ def main():
         except:
             pass
 
-        project_list.append(project_dict)
+        result[project[0]] = project_dict
+    return result
 
-    if args.server == "":
-        pprint(project_list)
-    else:
-        couch = couchdb.Server(args.server)
-        db = couch[args.db]
-        for fs_dict in project_list:
-            db.save(fs_dict)
+
+
+def cpu_hours():
+    current_time = datetime.datetime.now()
+
+    # script that runs on uppmax
+    uq = subprocess.Popen(["/sw/uppmax/bin/projinfo", '-q'], stdout=subprocess.PIPE)
+
+    # output is lines with the format: project_id  cpu_usage  cpu_limit
+    output = uq.communicate()[0]
+    result = {}
+    # parsing output
+    for proj in output.strip().split('\n'):
+        project_dict = {"time": current_time.isoformat()}
+
+        # split line into a list
+        project = proj.split()
+        # creating objects
+        project_dict["project"] = project[0]
+        project_dict["cpu hours"] = project[1]
+        project_dict["cpu limit"] = project[2]
+
+        result[project[0]] = project_dict
+    return result
+
+
+def save_results(disk_quota_data, cpu_hours_data, db_config):
+    merged_results = disk_quota_data
+
+    # merging 2 dicts into one
+    for project in cpu_hours_data.keys():
+        if project in disk_quota_data.keys():
+            # add keys if project already in the list
+            merged_results[project]['cpu hours'] = cpu_hours_data[project]['cpu hours']
+            merged_results[project]['cpu limit'] = cpu_hours_data[project]['cpu limit']
+        else:
+            # add project if not in the list
+            merged_results[project] = cpu_hours_data[project]
+
+
+    # create db instance
+    server = "http://{username}:{password}@{url}:{port}".format(
+        url=db_config['url'],
+        username=db_config['username'],
+        password=db_config['password'],
+        port=db_config['port'])
+
+    couch = couchdb.Server(server)
+    db = couch['uppmax']
+
+    # save results in the database
+    for project in merged_results.values():
+        db.save(project)
+
+
 
 if __name__ == "__main__":
-    main()
+    with open('/home/funk_001/.ngi_config/statusdb.yaml', 'r') as config_file:
+        config = yaml.load(config_file.readall())
+
+    disk_quota_dict = disk_quota()
+    cpu_hours_dict = cpu_hours()
+    save_results(disk_quota_dict, cpu_hours_dict, config['statusdb'])
+
+
