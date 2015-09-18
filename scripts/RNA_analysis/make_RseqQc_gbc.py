@@ -51,6 +51,6 @@ module load {3}
 module load rseqc/{6}
 cd {4}
 
-geneBody_coverage.py -i tophat_out_{0}/accepted_hits_{0}.bam -r {2} -o {0}
+geneBody_coverage.py -i tophat_out_{0}/accepted_hits_sorted_{0}.bam -r {2} -o {0}
 #CMD BATCH {0}.geneBodyCoverage_plot.r
 """.format(name, mail, bed_file, sam, path, extra_arg, rseqc_version)
