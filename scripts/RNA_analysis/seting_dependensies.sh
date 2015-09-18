@@ -22,7 +22,9 @@ gtf_file=$7
 WP=$8
 mail=$9
 order_num=${10}
-single=${11}
+genome=${11}
+single=${12}
+
 name_list=(`echo $names | tr "," "\n"`)
 
 cd $path
@@ -49,7 +51,7 @@ for i in ${name_list[*]};do
     DEP_REPORT=$DEP_REPORT:$JOB
     echo 'complexity'
     ## lib complexity
-    make_complexity_plots.py ${i} $mail $config_file $path $order_num
+    make_complexity_plots.py ${i} $mail $config_file $path $order_num $single
     JOBID=`sbatch complexity_${i}.sh| sed -re 's/.+\s+([0-9]+)/\1/'`
     DEPENDENCY=$DEPENDENCY:$JOBID
 done
@@ -81,7 +83,7 @@ DEP_REPORT=$DEP_REPORT:$JOB
 cp $WP/sll_logo.gif .
 make_sbatch.py a2012043 core 01:00:00 analysis_report $mail $config_file
 echo "cd $path
-analysis_report.py $project_id -c $config_file -r -s -d -f -g -w -b $single" >> analysis_report.sh
+analysis_report.py $project_id -c $config_file -r -s -d -f -g -w -b $single -G $genome" >> analysis_report.sh
 sbatch --dependency=$DEP_REPORT analysis_report.sh
 mkdir sbatch_scripts
 mv *.sh sbatch_scripts
