@@ -48,6 +48,7 @@ class DeliveryController(AbstractBaseController):
             (['--no_vcf'], dict(help="Don't include vcf files in delivery", action="store_true", default=False)),
             (['--bam_file_type'], dict(help="bam file type to deliver. Default sort-dup-gatkrecal-realign", action="store", default="sort-dup-gatkrecal-realign")),
             (['-z', '--size'], dict(help="Estimate size of delivery.", action="store_true", default=False)),
+            (['-r', '--root'], dict(help="Root directrory to be used instead of pre-defined from config file", action="store", default=None, type=str)),
             (['--statusdb_project_name'], dict(help="Project name in statusdb.", action="store", default=None)),
             (['--group'], dict(help="After raw data delivery, transfer group ownership of the delivered files to this group", action="store", default=None)),
             (['--outdir'], dict(help="Deliver to this (sub)directory instead. Added for cases where the delivery directory already exists and there is no write permission.", action="store", default=None)),
@@ -66,7 +67,7 @@ class DeliveryController(AbstractBaseController):
     def _process_args(self):
         # NB: duplicate of project.ProjectController._process_args
         # setup project search space
-        self._meta.project_root = self.app.config.get("project", "root")
+        self._meta.project_root = self.pargs.root if self.pargs.root else self.app.config.get("project", "root")
         # Set root path for parent class
         self._meta.root_path = self._meta.project_root
         assert os.path.exists(self._meta.project_root), "No such directory {}; check your project config".format(self._meta.project_root)
@@ -134,7 +135,7 @@ class DeliveryController(AbstractBaseController):
                 return
 
         # Setup paths and verify parameters
-        self._meta.production_root = self.app.config.get("production", "root")
+        self._meta.production_root = self.pargs.root if self.pargs.root else self.app.config.get("production", "root")
         self._meta.root_path = self._meta.production_root
         proj_base_dir = os.path.join(self._meta.root_path, self.pargs.project)
         assert os.path.exists(self._meta.production_root), "No such directory {}; check your production config".format(self._meta.production_root)
