@@ -71,7 +71,7 @@ Arguments:
     parser.add_option('-a', '--analysis_on_all', action="store_true", dest="analysis", default="False",
     help="Run ht-seq and cufflinks on all samples. Default will be to run only on merged samples.")
     parser.add_option('-G', '--genome', action="store", dest="genome", default=None,
-    help="Reference genome name (eg. 'GRCh37') Default: fetch from status DB")
+    help="Reference genome name (eg. hg19, mm9, rn4, rn5, sacCer2, Zv8, Zv9, Zv10, dm3) Default: fetch from status DB")
     parser.add_option('-f', '--single', action="store_true", dest="single", default="False", help="single end.")
     (opts, args) = parser.parse_args()
 
