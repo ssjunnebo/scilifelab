@@ -68,17 +68,17 @@ if [ $DEPENDENCY = 'afterok' ]; then
     dep=""
 else 
     dep=" --dependency=$DEPENDENCY"
-    echo "If you get a warning telling that the dependensy list is to long, you will have to restart the setting_dependensies.sh script manualy. This should be done after the folowing jobs are finished:
+    echo "If you get a warning telling that the dependensy list is to long, you will have to restart the setting_dependencies.sh script manualy. This should be done after the folowing jobs are finished:
     
     $DEPENDENCY
     
     When all the jobbs are finished, start the rest of the pipeline by giving the command:
 
-    sbatch $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
+    sbatch $WP/setting_dependencies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
 
-    This command is saved in the text file setting_dependensies.txt 
+    This command is saved in the text file setting_dependencies.txt 
     "
-    echo sbatch $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single>> setting_dependensies.txt
+    echo sbatch $WP/setting_dependencies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single>> setting_dependencies.txt
 fi
 
-sbatch$dep $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
+sbatch$dep $WP/setting_dependencies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
