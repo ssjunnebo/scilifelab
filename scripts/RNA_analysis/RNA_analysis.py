@@ -15,7 +15,7 @@ def find_proj_from_view(proj_db, proj_id):
     return None
 
 
-def main(args,mail,conffile,analysis,stranded,single):
+def main(args,mail,conffile,analysis,stranded,single,genome):
     project = args[0]
     ord_num = args[1]
     runs = args[2:]
@@ -29,13 +29,13 @@ def main(args,mail,conffile,analysis,stranded,single):
     proj_db = couch['projects']
     key = find_proj_from_view(proj_db, project)
     info = proj_db[key]
-    reference_genome = info['reference_genome']
+    reference_genome = genome if genome else info['reference_genome']
     RNA_analysis_settings = conf['custom_algorithms']['RNA-seq analysis']
     refpath = RNA_analysis_settings[reference_genome]['genomepath']
     gtfpath = RNA_analysis_settings[reference_genome]['gtfpath']
     bedpath = RNA_analysis_settings[reference_genome]['bedpath']
     today = str(datetime.today().isoformat()).replace('-','_').split('.')[0].replace(':','_')
-    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-o', ord_num, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single)] + runs
+    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-o', ord_num, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single), '-G', genome] + runs
     command=' '.join(command)
     print command
     os.system(command)
@@ -70,7 +70,9 @@ Arguments:
     help="Run tophat with --librarytype fr-firststranded option for strand-specific RNAseq.")
     parser.add_option('-a', '--analysis_on_all', action="store_true", dest="analysis", default="False",
     help="Run ht-seq and cufflinks on all samples. Default will be to run only on merged samples.")
+    parser.add_option('-G', '--genome', action="store", dest="genome", default=None,
+    help="Reference genome name (eg. 'GRCh37') Default: fetch from status DB")
     parser.add_option('-f', '--single', action="store_true", dest="single", default="False", help="single end.")
     (opts, args) = parser.parse_args()
 
-    main(args,opts.mail,opts.conffile,opts.analysis,opts.stranded, opts.single)
+    main(args,opts.mail,opts.conffile,opts.analysis,opts.stranded, opts.single, opts.genome)

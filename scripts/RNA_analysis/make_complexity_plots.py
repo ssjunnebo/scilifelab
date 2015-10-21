@@ -36,6 +36,8 @@ except:
 
 f=open("complexity_"+name+".sh",'wa')
 
+##### {0}: sample name, {1}: email address, {2}: preseq, {3}: bamtools  #####
+##### {4}: full path to analysis dir., {5}: --qos=seqver, {6}: BEDTools #####
 print >>f, """#!/bin/bash -l
 #SBATCH -A a2012043
 #SBATCH -p core -n 3
@@ -48,14 +50,13 @@ print >>f, """#!/bin/bash -l
 #SBATCH {5}
 
 module load bioinfo-tools
-module load {6}
-module load {3}
-module load {2}
-
+module load {6} 
+module load {3} 
+module load {2} 
 cd {4}
 """.format(name, mail, preseq, bam, path, extra_arg, bed)
 
-if len(sys.argv)==6:
+if len(sys.argv)==6 and sys.argv=='-e':
 	print >>f, """bedtools bamtobed -i tophat_out_{0}/accepted_hits_sorted_{0}.bam | sort -k 1,1 -k 2,2n -k 6,6 >tophat_out_{0}/accepted_hits_sorted_preseq_{0}.bed
 preseq lc_extrap -e {1} -P -v -o tophat_out_{0}/{0}.ccurve.txt tophat_out_{0}/accepted_hits_sorted_preseq_{0}.bed
 	""".format(name, extrap)

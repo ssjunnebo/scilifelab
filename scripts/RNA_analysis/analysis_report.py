@@ -17,9 +17,10 @@ from texttable import Texttable
 from bcbio.pipeline.config_loader import load_config
 from scilifelab.db.statusDB_utils import load_couch_server
 from scilifelab.db.statusDB_utils import find_proj_from_view
-
 #from scilifelab.report.rst import make_logo_table
 import operator
+
+
 
 def image(fp, width):
    res = ".. figure:: %s\n    :width: %s\n\n" % (fp, width)
@@ -370,23 +371,24 @@ def generate_report(config_file,proj_conf,single_end,stranded,genome):
     proj_db = couch['projects']
     key = find_proj_from_view(proj_db, proj_conf['id'])
     info = proj_db[key]
+    species= {
+	'hg19': 'Human',
+	'mm9': 'Mouse',
+	'rn4': 'Rat',
+	'rn5': 'Rat',
+	'Zv8': 'Zebrafish',
+	'Zv9': 'Zebrafish',
+	'Zv10': 'Zebrafish',
+	'sacCer2': 'Saccharomyces cerevisiae',
+	'dm3': 'Drosophila melanogaster'
+    }
     try:
         uppnex_proj = info['uppnex_id']
-        reference_genome = genome if genome else info['reference_genome']
-        if reference_genome == "hg19":
-            d['species'] = 'Human'
-        elif reference_genome == "mm9":
-            d['species'] = 'Mouse'
-	elif reference_genome == "rn4":
-	    d['species'] = 'Rat'
-	elif reference_genome in ("Zv9", "Zv8"):
-            d['species'] = 'Zebrafish'
-	elif reference_genome == "sacCer2":
-            d['species'] = 'Saccharomyces cerevisiae'
-        elif reference_genome == "dm3":
-            d['species'] = 'Drosophila melanogaster'
-        else:
-            d['species'] = reference_genome
+        reference_genome = genome if genome else info['reference_genome'] 
+	if reference_genome in species.keys():
+		d['species'] = species.get(reference_genome, reference_genome)
+	else:
+		d['species'] = reference_genome
     except:
         uppnex_proj = ""
         print "No uppnex ID fetched"
@@ -666,7 +668,7 @@ if __name__ == "__main__":
     parser.add_option( "-b", "--complexity", dest="complexity",action="store_true", default=False,
     help = "to include library complexity plot")
     parser.add_option('-G', '--genome', action="store", dest="genome", default=None,
-    help="Reference genome name (eg. 'GRCh37') Default: fetch from status DB")
+    help="Reference genome name (eg. hg19, mm9, rn4, rn5, sacCer2, Zv8, Zv9, Zv10, dm3) Default: fetch from status DB")
     (options, args) = parser.parse_args()
     if len(args) < 1:
         print __doc__
