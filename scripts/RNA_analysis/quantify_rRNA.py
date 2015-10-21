@@ -13,8 +13,8 @@ if len(sys.argv) < 2:
 
 gffFile=sys.argv[1]
 
-rRNAgeneList=commands.getoutput("grep 'rRNA' "+gffFile+" |awk '{print $10}'").replace('"','').replace(";","").split("\n")
-
+#rRNAgeneList=commands.getoutput("grep 'rRNA' "+gffFile+" |awk '{print $10}'").replace('"','').replace(";","").split("\n")
+rRNAgeneList=commands.getoutput("grep 'rRNA' "+gffFile+" |awk -F ';' '{for (i=1; i<=NF; i++) {if ($i~"+"/"+"gene_id"+"/"+") print $i}}' |cut -d "+"'"+'"'+"' "+"-f 2 |sort |uniq").split('\n')
 names=commands.getoutput("ls -d tophat_out_*|sed 's/tophat_out_//g'").split('\n')
 outList=[]
 for name in names:
@@ -37,10 +37,10 @@ for name in names:
 			outList.append(outLine)
         except:
                 print "could not handle " + DIR
-                pass	
+                pass
 if outList==[]:
 	print 'No data found. Check count tables!'
 
-outF=open("rRNA.quantification",'w')
+outF=open("rRNA.quantification_test",'w')
 outF.writelines(outList)
 outF.close()
