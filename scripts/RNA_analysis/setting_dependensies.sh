@@ -2,9 +2,9 @@
 #SBATCH -A a2012043 
 #SBATCH -p core
 #SBATCH -t 01:00:00
-#SBATCH -J seting_dependensies
-#SBATCH -e seting_dependensies.err
-#SBATCH -o seting_dependensies.out
+#SBATCH -J setting_dependensies
+#SBATCH -e setting_dependensies.err
+#SBATCH -o setting_dependensies.out
 while getopts ":e:" option; do
         case ${option} in
                 e) extra_arg=${OPTARG};;
