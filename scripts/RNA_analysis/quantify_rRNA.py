@@ -41,6 +41,6 @@ for name in names:
 if outList==[]:
 	print 'No data found. Check count tables!'
 
-outF=open("rRNA.quantification_test",'w')
+outF=open("rRNA.quantification",'w')
 outF.writelines(outList)
 outF.close()
