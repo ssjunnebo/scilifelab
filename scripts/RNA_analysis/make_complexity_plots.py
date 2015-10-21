@@ -7,12 +7,12 @@ Usage:
 make_complexity_plots.py  <sample_name> <mail> <config_file> <path> <order_num> <single_end>
 
         sample_name		This name: /tophat_out_<sample name>
-        mail                  	eg: jun.wang@scilifelab.se
-        config_file           	post_process.yaml assumes that you have specified samtools
-                                version under 'custom_algorithms'/'RNA-seq analysis'
-        path                  	Path to analysis dir containing the tophat_out_ directories
-        order_num               Millions of ordered number of reads
-	single_end		For single end runs (-e)
+        mail            eg: jun.wang@scilifelab.se
+        config_file     post_process.yaml assumes that you have specified samtools
+                        version under 'custom_algorithms'/'RNA-seq analysis'
+        path            Path to analysis dir containing the tophat_out_ directories
+        order_num       Millions of ordered number of reads
+    	single_end		For single end runs (-e)
         """
     sys.exit()
 
@@ -50,18 +50,18 @@ print >>f, """#!/bin/bash -l
 #SBATCH {5}
 
 module load bioinfo-tools
-module load {6} 
-module load {3} 
-module load {2} 
+module load {6}
+module load {3}
+module load {2}
 cd {4}
 """.format(name, mail, preseq, bam, path, extra_arg, bed)
 
-if len(sys.argv)==6 and sys.argv=='-e':
+if len(sys.argv)==6 or sys.argv[6]!='-e':
 	print >>f, """bedtools bamtobed -i tophat_out_{0}/accepted_hits_sorted_{0}.bam | sort -k 1,1 -k 2,2n -k 6,6 >tophat_out_{0}/accepted_hits_sorted_preseq_{0}.bed
 preseq lc_extrap -e {1} -P -v -o tophat_out_{0}/{0}.ccurve.txt tophat_out_{0}/accepted_hits_sorted_preseq_{0}.bed
 	""".format(name, extrap)
-else:
+elif len(sys.argv)>6 and sys.argv[6]=='-e':
 	print >>f, """preseq lc_extrap -e {1} -v -B tophat_out_{0}/accepted_hits_sorted_{0}.bam -o tophat_out_{0}/{0}.ccurve.txt
 	""".format(name, extrap)
 
-
+f.close()
