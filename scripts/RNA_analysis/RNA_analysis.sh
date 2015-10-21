@@ -2,7 +2,7 @@
 #	This script generates some basic statistics and a report for a RNA-seq project
 #	and should be run from the intermediate directory of the project to be analysed.
 
-while getopts ":p:o:b:g:m:c:e:a:s:d:f:" option; do
+while getopts ":p:o:b:g:m:c:e:a:s:d:f:G:" option; do
     case ${option} in
         p) project_id=${OPTARG};;
         o) order_num=${OPTARG};;   
@@ -15,6 +15,7 @@ while getopts ":p:o:b:g:m:c:e:a:s:d:f:" option; do
         s) stranded=${OPTARG};;
         d) date=${OPTARG};;
         f) single=${OPTARG};;
+	G) genome=${OPTARG};;
     esac
 done
 shift $(( OPTIND - 1 ))
@@ -67,17 +68,17 @@ if [ $DEPENDENCY = 'afterok' ]; then
     dep=""
 else 
     dep=" --dependency=$DEPENDENCY"
-    echo "If you get a warning telling that the dependensy list is to long, you will have to restart the seting_dependensies.sh script manualy. This should be done after the folowing jobs are finished:
+    echo "If you get a warning telling that the dependensy list is to long, you will have to restart the setting_dependensies.sh script manualy. This should be done after the folowing jobs are finished:
     
     $DEPENDENCY
     
     When all the jobbs are finished, start the rest of the pipeline by giving the command:
 
-    sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single
+    sbatch $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
 
-    This command is saved in the text file seting_dependensies.txt 
+    This command is saved in the text file setting_dependensies.txt 
     "
-    echo sbatch $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single >> seting_dependensies.txt
+    echo sbatch $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single>> setting_dependensies.txt
 fi
 
-sbatch$dep $WP/seting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $single
+sbatch$dep $WP/setting_dependensies.sh $names $bedfile $project_id $config_file $run_dir $analysis_path $gtf_file $WP $mail $order_num $genome $single
