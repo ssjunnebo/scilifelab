@@ -90,7 +90,6 @@ def save_results(disk_quota_data, cpu_hours_data, db_config):
             # add project if not in the list
             merged_results[project] = cpu_hours_data[project]
 
-
     logging.info("Connecting to the Database: {url}".format(url=db_config['url']))
     # create db instance
     server = "http://{username}:{password}@{url}:{port}".format(
@@ -128,11 +127,13 @@ if __name__ == "__main__":
         help="Path to the DB config file.")
 
     parser.add_argument("--log-level", dest="log_level", default="error", help="Log level: debug, info, error, critical")
-    parser.add_argument("--log-file", dest="log_file", default=sys.stdout, help="Path to log file")
+    parser.add_argument("--log-file", dest="log_file", help="Path to log file")
 
     args = parser.parse_args()
-
-    logging.basicConfig(format="", levelname=args.log_level, filename=args.log_file)
+    if args.log_file is not None:
+        logging.basicConfig(format="", levelname=args.log_level, filename=args.log_file)
+    else:
+        logging.basicConfig(format="", levelname=args.log_level, stream=sys.stdout)
     try:
         with open(args.config, 'r') as config_file:
             config = yaml.load(config_file.read())
