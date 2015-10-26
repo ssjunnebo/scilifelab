@@ -85,7 +85,7 @@ def prepare_lane_run_dir(p,lane):
         os.mkdir(an_path)
     return an_path
 
-def frag_len_from_couch(fpath, files, single,samp, info):
+def frag_len_from_couch(fpath, files, single,samp, info, inner, adapter):
     """trying to get average fragemnt length from couchDB if not single end."""
     if single is True:
         R1 = fpath + '/' + files['R1']
@@ -97,38 +97,54 @@ def frag_len_from_couch(fpath, files, single,samp, info):
         R2 = fpath + '/' + files['R2']
         print R1
         print R2
-        innnerdistflagg = '-r'
-        size = get_size(samp,info,samp)
-        try:
-            size = get_size(samp,info,samp)
-            print "Average fragment length ", str(size)
-        except:
-            size = raw_input("Could not find information on statusDB. Enter manualy fragment size including adapters for sample " + samp + ": ")
-            pass
-        innerdist = str(int(size) - 101 - 101 - 136)
-        size=str(size)
-        if not size.isdigit(): sys.exit(0)
-    return innerdist, innnerdistflagg, R1, R2
+	if inner is "False":
+		innnerdistflagg =""
+		innerdist=""
+	else:
+		innnerdistflagg = '-r'
+		if inner=="statusDB" :
+        		try:
+            			size = get_size(samp,info,samp)
+            			print "Average fragment length ", str(size)
+			except:
+				size = raw_input("Could not find information on statusDB. Enter fragment size including adapters for sample " + samp + ": ")
+				pass
+			try:
+				read_len=info['details']['sequencing_setup'].split('x')[1]
+				print "Read length", str(read_len)
+			except:
+				print "Could not find sequencing setup on statusDB. Proceeding with the common value for paired-end: 125bp"
+				read_len=125
+			try:
+				innerdist = str(int(size) - int(read_len) - int(read_len) - int(adapter))
+			except (ValueError):
+				print "[ERROR]: Wrong/No number specified for the length of adapter, it must be a integer (eg. --adapter 135)."
+		else:
+			try:
+				innerdist=int(inner)
+			except:
+				print "[Error]: 'inner-dist' must be a integer (eg. --inner-dist 60)"
 
+	return innerdist, innnerdistflagg, R1, R2
 
 def Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale):
     """Generating sbatch file for sample"""
     f = open(an_path+"/map_tophat_"+samp+".sh", "w")
     if fai != '':
-        make_fai="""genomeCoverageBed -bga -split -ibam accepted_hits_sorted_dupRemoved_"""+samp+""".bam -g """+fai+""" > sample_"""+samp+""".bga"""+ bedGraphToBigWig +""" sample_"""+samp+""".bga"""+fai+""" sample_"""+samp+""".bw"""
+	make_fai="""genomeCoverageBed -bga -split -ibam accepted_hits_{samp}.bam -g {fai} > sample_{samp}.bga\nbedGraphToBigWig sample_{samp}.bga {fai} sample_{samp}.bw""".format(**locals())
     else:
         make_fai=''
     print >>f, """#! /bin/bash -l
 
 #SBATCH -A a2012043
 #SBATCH -p core -n 8
-#SBATCH -t """+hours+"""
-#SBATCH -J tophat_"""+samp+"""
-#SBATCH -e tophat_"""+samp+""".err
-#SBATCH -o tophat_"""+samp+""".out
-#SBATCH --mail-user="""+mail+"""
+#SBATCH -t {hours}
+#SBATCH -J tophat_{samp}
+#SBATCH -e tophat_{samp}.err
+#SBATCH -o tophat_{samp}.out
+#SBATCH --mail-user={mail}
 #SBATCH --mail-type=ALL
-"""+extra_arg+"""
+{extra_arg}
 
 module unload bioinfo-tools
 module unload bowtie
@@ -136,15 +152,15 @@ module unload tophat
 
 module load bioinfo-tools
 module load samtools
-module load tophat/"""+aligner_version+"""
+module load tophat/{aligner_version}
 
-tophat -o tophat_out_"""+samp+""" """+qscale+""" -p 8 """+aligner_libtype+""" """+innnerdistflagg+""" """+innerdist+""" """+refpath+""" """+R1+""" """+R2+"""
-cd tophat_out_"""+samp+"""
-mv accepted_hits.bam accepted_hits_"""+samp+""".bam
-"""+make_fai
+tophat -o tophat_out_{samp} {qscale} -p 8 {aligner_libtype} {innnerdistflagg} {innerdist} {refpath} {R1} {R2}
+cd tophat_out_{samp}
+mv accepted_hits.bam accepted_hits_{samp}.bam
+""".format(**locals())+make_fai
     f.close()
 
-def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded,genome):
+def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded,genome,inner,adapter):
     proj_ID = args[0]
     flow_cell = args[1]
     if phred64 == True:
@@ -182,8 +198,12 @@ def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded,geno
     for lane in file_info:
         an_path = prepare_lane_run_dir(p,lane)
         for samp in sorted(file_info[lane]):
-            innerdist, innnerdistflagg, R1, R2 = frag_len_from_couch(fpath, file_info[lane][samp], single, samp, info)
-            Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale)
+		try: 
+			innerdist, innnerdistflagg, R1, R2 = frag_len_from_couch(fpath, file_info[lane][samp], single, samp, info, inner, adapter)
+			Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale)
+		except:
+			print "{}\n[Error Occured] No sbatch script generated!".format("-" * 30)
+			
 
 if __name__ == '__main__':
     usage = """make_tophat_sbatch.py <project ID> <Flow cell ID, eg 121113_BD1HG4ACXX>"""
@@ -209,6 +229,10 @@ if __name__ == '__main__':
     help="Run tophat with --librarytype fr-firststranded option for strand-specific RNAseq.")
     parser.add_option('-g', '--genome', action="store", dest="genome", default=None,
     help="Reference genome name (eg. hg19, mm9, rn4, rn5, sacCer2, Zv8, Zv9, Zv10, dm3) Default: fetch from status DB")
+    parser.add_option('--inner-dist', action="store", dest="inner", default="False",
+    help="Usage: --inner-dist [statusDB/<int>]. Specify inner distance between read pairs or fetch the value from status DB. Default: 50 (TopHat default setting).")
+    parser.add_option('--adapter', action="store", dest="adapter", default="135",
+    help="Length of the adapter. Default: 135")
 
     (opts, args)    = parser.parse_args()
-    main(args,opts.phred64,opts.fai,opts.projtag,opts.mail,opts.hours,opts.conffile,opts.fpath,opts.single,opts.stranded,opts.genome)
+    main(args,opts.phred64,opts.fai,opts.projtag,opts.mail,opts.hours,opts.conffile,opts.fpath,opts.single,opts.stranded,opts.genome,opts.inner,opts.adapter)
