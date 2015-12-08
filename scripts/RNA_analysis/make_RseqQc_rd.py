@@ -49,6 +49,7 @@ print >>f, """#!/bin/bash -l
 #SBATCH --mail-user={1}
 {5}
 module load bioinfo-tools
+moodule unlad gcc
 module unload samtools
 module load {3}
 module load rseqc/{6}

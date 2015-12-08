@@ -46,6 +46,7 @@ print >>f, """#!/bin/bash -l
 #SBATCH {5}
 
 module load bioinfo-tools
+module unaload gcc
 module unload samtools
 module load {3}
 module load rseqc/{6}

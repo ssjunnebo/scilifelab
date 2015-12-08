@@ -40,6 +40,7 @@ print >>f, """#!/bin/bash -l
 #SBATCH """+extra_arg+"""
 
 module load bioinfo-tools
+module unload gcc
 module load rseqc/"""+rseqc_version+"""
 
 cd """+path+"""

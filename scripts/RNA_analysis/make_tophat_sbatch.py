@@ -97,35 +97,34 @@ def frag_len_from_couch(fpath, files, single,samp, info, inner, adapter):
         R2 = fpath + '/' + files['R2']
         print R1
         print R2
-	if inner is "False":
-		innnerdistflagg =""
-		innerdist=""
-	else:
-		innnerdistflagg = '-r'
-		if inner=="statusDB" :
-        		try:
-            			size = get_size(samp,info,samp)
-            			print "Average fragment length ", str(size)
-			except:
-				size = raw_input("Could not find information on statusDB. Enter fragment size including adapters for sample " + samp + ": ")
-				pass
-			try:
-				read_len=info['details']['sequencing_setup'].split('x')[1]
-				print "Read length", str(read_len)
-			except:
-				print "Could not find sequencing setup on statusDB. Proceeding with the common value for paired-end: 125bp"
-				read_len=125
-			try:
-				innerdist = str(int(size) - int(read_len) - int(read_len) - int(adapter))
-			except (ValueError):
-				print "[ERROR]: Wrong/No number specified for the length of adapter, it must be a integer (eg. --adapter 135)."
-		else:
-			try:
-				innerdist=int(inner)
-			except:
-				print "[Error]: 'inner-dist' must be a integer (eg. --inner-dist 60)"
-
-	return innerdist, innnerdistflagg, R1, R2
+        if inner == False:
+            innnerdistflagg =""
+            innerdist=""
+        else:
+            innnerdistflagg = '-r'
+            if inner=="statusDB" :
+                try:
+                    size = get_size(samp,info,samp)
+                    print "Average fragment length ", str(size)
+                except:
+                    size = raw_input("Could not find information on statusDB. Enter fragment size including adapters for sample " + samp + ": ")
+                    pass
+                try:
+                     read_len=info['details']['sequencing_setup'].split('x')[1]
+                     print "Read length", str(read_len)
+                except:
+                     print "Could not find sequencing setup on statusDB. Proceeding with the common value for paired-end: 125bp"
+                     read_len=125
+                try:
+                     innerdist = str(int(size) - int(read_len) - int(read_len) - int(adapter))
+                except (ValueError):
+                     print "[ERROR]: Wrong/No number specified for the length of adapter, it must be a integer (eg. --adapter 135)."
+            else:
+                try:
+                     innerdist=int(inner)
+                except:
+                     print "[Error]: 'inner-dist' must be a integer (eg. --inner-dist 60)"
+    return innerdist, innnerdistflagg, R1, R2
 
 def Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale):
     """Generating sbatch file for sample"""
@@ -198,12 +197,11 @@ def main(args,phred64,fai,projtag,mail,hours,conffile,fpath,single,stranded,geno
     for lane in file_info:
         an_path = prepare_lane_run_dir(p,lane)
         for samp in sorted(file_info[lane]):
-		try: 
-			innerdist, innnerdistflagg, R1, R2 = frag_len_from_couch(fpath, file_info[lane][samp], single, samp, info, inner, adapter)
-			Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale)
-		except:
-			print "{}\n[Error Occured] No sbatch script generated!".format("-" * 30)
-			
+            try:
+                innerdist, innnerdistflagg, R1, R2 = frag_len_from_couch(fpath, file_info[lane][samp], single, samp, info, inner, adapter)
+                Generat_sbatch_file(an_path,hours ,samp ,mail ,aligner_version,innerdist,refpath,innnerdistflagg,R1,R2,extra_arg, aligner_libtype,fai, qscale)
+            except:
+                print "{}\n[Error Occured] No sbatch script generated!".format("-" * 30)
 
 if __name__ == '__main__':
     usage = """make_tophat_sbatch.py <project ID> <Flow cell ID, eg 121113_BD1HG4ACXX>"""

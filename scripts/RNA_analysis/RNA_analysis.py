@@ -35,7 +35,7 @@ def main(args,mail,conffile,analysis,stranded,single,genome):
     gtfpath = RNA_analysis_settings[reference_genome]['gtfpath']
     bedpath = RNA_analysis_settings[reference_genome]['bedpath']
     today = str(datetime.today().isoformat()).replace('-','_').split('.')[0].replace(':','_')
-    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-o', ord_num, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single), '-G', genome] + runs
+    command=[os.environ['HOME']+'/opt/scilifelab/scripts/RNA_analysis/RNA_analysis.sh', '-p', project, '-o', ord_num, '-b', bedpath, '-g', gtfpath, '-m', mail, '-c', conffile, '-e', '"'+extra_arg+'"' ,'-a', str(analysis),'-s' , str(stranded),'-d',today, '-f', str(single), '-G', reference_genome] + runs
     command=' '.join(command)
     print command
     os.system(command)

@@ -38,7 +38,8 @@ print >>f, """#! /bin/bash -l
 #SBATCH --mail-type=ALL
 """ + extra_arg + """
 
-module add bioinfo-tools
+module load bioinfo-tools
+module unload gcc
 module load samtools
 module load rseqc/""" + rseqc_version + """
 
