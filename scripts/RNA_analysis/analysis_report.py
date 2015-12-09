@@ -5,8 +5,6 @@ import commands
 import math
 from optparse import OptionParser
 from operator import itemgetter
-#from numpy import *
-#from pylab import *
 import json
 import yaml
 import glob
