@@ -2,14 +2,16 @@
 import os
 import sys
 import commands
+import math
 from optparse import OptionParser
 from operator import itemgetter
-from numpy import *
-from pylab import *
 import json
 import yaml
 import glob
 import re
+import matplotlib
+import matplotlib.pyplot as plt
+
 from datetime import date
 from mako.template import Template
 from mako.lookup import TemplateLookup
@@ -372,23 +374,23 @@ def generate_report(config_file,proj_conf,single_end,stranded,genome):
     key = find_proj_from_view(proj_db, proj_conf['id'])
     info = proj_db[key]
     species= {
-	'hg19': 'Human',
-	'mm9': 'Mouse',
-	'rn4': 'Rat',
-	'rn5': 'Rat',
-	'Zv8': 'Zebrafish',
-	'Zv9': 'Zebrafish',
-	'Zv10': 'Zebrafish',
-	'sacCer2': 'Saccharomyces cerevisiae',
-	'dm3': 'Drosophila melanogaster'
+        'hg19': 'Human',
+        'mm9': 'Mouse',
+        'rn4': 'Rat',
+        'rn5': 'Rat',
+        'Zv8': 'Zebrafish',
+        'Zv9': 'Zebrafish',
+        'Zv10': 'Zebrafish',
+        'sacCer2': 'Saccharomyces cerevisiae',
+        'dm3': 'Drosophila melanogaster'
     }
     try:
         uppnex_proj = info['uppnex_id']
-        reference_genome = genome if genome else info['reference_genome'] 
-	if reference_genome in species.keys():
-		d['species'] = species.get(reference_genome, reference_genome)
-	else:
-		d['species'] = reference_genome
+        reference_genome = genome if genome else info['reference_genome']
+        if reference_genome in species.keys():
+                d['species'] = species.get(reference_genome, reference_genome)
+        else:
+                d['species'] = reference_genome
     except:
         uppnex_proj = ""
         print "No uppnex ID fetched"
@@ -468,26 +470,49 @@ def generate_report(config_file,proj_conf,single_end,stranded,genome):
 
     ## Gene Body Coverage
     try:
-        figure()
-        x = range(0,101)
-        for i in range(len(proj_conf['samples'])):
-            y = zeros(101)
-            sample_name = proj_conf['samples'][i]
-            f = open(sample_name + '.geneBodyCoverage.txt','r')
-            for line in f.readlines():
-                try:
-                    key = int(line.split()[0])
-                    val = int(line.split()[1])
-                    y[key] = val
-                except:
-                    pass
-            plot(x,y)#,label=proj_conf['samples'][i])
-        #legend(loc='upper left',fontsize='xx-small')
-        ylabel("read number")
-        xlabel("percentile of gene body (5'->3')")
-        savefig('gbc.pdf')
-        d['GBC'] = image("gbc.pdf", width="100%")
+        pdf_fn="geneBodyCoverage.pdf"
+        values = [1] *101
+        fig = plt.figure()
+        axes = fig.add_subplot(111)
+        plt.subplots_adjust(right=0.7)
+        sample_num=len(proj_conf['samples'])
+        n=math.ceil(float(sample_num)/12)
+        col=math.ceil(float(sample_num)/40)
+        colours = ['#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c',
+                '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928']*int(n)
+        i = 0
+        for s in range(0,sample_num):
+            sample_name = proj_conf['samples'][s]
+            coverage_file = sample_name + '.geneBodyCoverage.txt'
+            fn = os.path.realpath(coverage_file)
+            try:
+                lines=open(fn).readlines()
+                for l in range(1,101):
+                    (percentile, count) = (lines[0].split()[l],lines[1].split()[l])
+                    if percentile.isdigit() is False:
+                        continue
+                    values[int(percentile)] = float(count) / 1000000
+                    #print values
+            except IOError as e:
+                print "Could not load input file: {}".format(fn)
+            axes.plot(values, label=sample_name, color=colours[i])
+            i += 1
+        # Tidy the axes
+        axes.tick_params(which='both', labelsize=8, direction='out', top=False, right=False)
+        # Make the x axis labels percentages
+        axes.set_xticklabels(["%d%%" % p for p in axes.get_xticks()])
+        # Labels
+        matplotlib.rcParams['mathtext.default'] = 'regular'
+        plt.xlabel(r"Gene body position ($5' \rightarrow 3'$)")
+        plt.ylabel(r'Cumulative Read Count ($\times 10^6$)')
+        plt.title('Gene Body Coverage')
+        #Legend
+        axes.legend(loc='upper left', bbox_to_anchor = (1.02, 1.02), fontsize=6, ncol=int(col))
+        plt.savefig(pdf_fn)
+        d['GBC'] = image(pdf_fn, width="100%")
+        plt.close(fig)
     except:
+        print sys.exc_info()
         print "could not make GBC plot"
 
     ##  FPKM_heatmap
