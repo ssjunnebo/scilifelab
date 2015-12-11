@@ -97,7 +97,7 @@ def frag_len_from_couch(fpath, files, single,samp, info, inner, adapter):
         R2 = fpath + '/' + files['R2']
         print R1
         print R2
-        if inner == False:
+        if inner is not True:
             innnerdistflagg =""
             innerdist=""
         else:
