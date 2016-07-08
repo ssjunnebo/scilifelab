@@ -127,12 +127,6 @@ class DeliveryController(AbstractBaseController):
             if not self.pargs.uppmax_project:
                 self.log.error("Uppmax project was not specified and could not be fetched from project database")
                 return
-        
-        # Find uncompressed fastq
-        uncompressed = self._find_uncompressed_fastq_files(proj_base_dir=proj_base_dir, sample=self.pargs.sample, flowcell=self.pargs.flowcell)
-        if len(uncompressed) > 0:
-            self.log.error("There are uncompressed fastq file for project, kindly check all files are compressed properly before delivery")
-            return
 
         # Setup paths and verify parameters
         self._meta.production_root = self.pargs.root if self.pargs.root else self.app.config.get("production", "root")
@@ -157,13 +151,20 @@ class DeliveryController(AbstractBaseController):
         assert os.path.exists(destination_root), "Delivery destination folder {} does not exist".format(destination_root)
         destination_root = os.path.join(destination_root,self.pargs.project)
         
+        # Find uncompressed fastq
+        uncompressed = self._find_uncompressed_fastq_files(proj_base_dir=proj_base_dir, sample=self.pargs.sample, flowcell=self.pargs.flowcell)
+        if len(uncompressed) > 0:
+            self.log.error("There are uncompressed fastq file for project, kindly check all files are compressed properly before delivery")
+            return
+        
         # Extract the list of samples and runs associated with the project and sort them
         samples = self.samples_to_copy(pid = p_con.get_entry(self.pargs.project, "project_id"),
-                                       fc_dict = {'HiSeq2500':fcon.proj_list, 'HiSeqX':xcon.proj_list},
-                                       sample = self.pargs.sample,
-                                       flowcell = self.pargs.flowcell,
+                                       pod = p_con.get_entry(self.pargs.project, "open_date"),
+                                       fc_dict = {'HiSeq2500':f_con.proj_list, 'HiSeqX':x_con.proj_list},
                                        proj_base_dir = proj_base_dir,
-                                       destination_root = destination_root)
+                                       destination_root = destination_root,
+                                       sample = self.pargs.sample,
+                                       flowcell = self.pargs.flowcell)
 
         # If interactively select, build a list of samples to skip
         if self.pargs.interactive:
@@ -175,9 +176,9 @@ class DeliveryController(AbstractBaseController):
 
         if self.pargs.sample:
             sample = samples.get(self.pargs.sample)
-                    if not sample:
-                        self.log.error("There is no such sample {} for project {}".format(self.pargs.sample, self.pargs.project))
-                        return
+            if not sample:
+                self.log.error("There is no such sample {} for project {}".format(self.pargs.sample, self.pargs.project))
+                return
             samples = {self.pargs.sample: sample}
 
         self.log.info("Will deliver data for {} samples from project {} to {}".format(len(samples),self.pargs.project,destination_root))
@@ -237,12 +238,11 @@ class DeliveryController(AbstractBaseController):
 
                 # log the transfer to statusdb if verification passed
                 if passed:
-                    self.log.info("Logging delivery to StatusDB document {}".format(id))
                     data = {'raw_data_delivery': {'timestamp': utc_time(),
-                                                  'files': {os.path.splitext((os.path.basename(srcpath))[0]:{'md5': m,
+                                                  'files': {os.path.splitext((os.path.basename(srcpath)))[0]:{'md5': m,
                                                                                 'path': os.path.splitext(mfile)[0],
                                                                                 'size_in_bytes': self._getsize(os.path.splitext(mfile)[0]),
-                                                                                'source_location': srcpath} for m, mfile, srcpath in md5},
+                                                                                'source_location': srcpath} for m, mfile, srcpath in md5}
                                                   }
                             }
                     jsonstr = json.dumps(data)
@@ -254,8 +254,11 @@ class DeliveryController(AbstractBaseController):
                         fc_con = x_con
                     else:
                         fc_con = f_con
-                    fb_obj = fc_con.get_entry(fc)
-                    fb_obj['raw_data_delivery'] = fb_obj.get('raw_data_delivery', {}).update(data)
+                    fc_obj = fc_con.get_entry(fc)
+                    self.log.info("Logging delivery to StatusDB document {}".format(fc_obj.get('_id')))
+                    fc_raw_data = fc_obj.get('raw_data_delivery', {})
+                    fc_raw_data.update(data['raw_data_delivery'])
+                    fc_obj['raw_data_delivery'] = fc_raw_data
                     self._save(fc_con,fc_obj)
                     self.log.debug(jsonstr)
 
@@ -288,10 +291,10 @@ class DeliveryController(AbstractBaseController):
         files = glob.glob(path)
         return files
 
-    def samples_to_copy(self, pid, fc_dict, sample=None, flowcell=None, proj_base_dir, destination_root):
+    def samples_to_copy(self, pid, pod, fc_dict, proj_base_dir, destination_root, sample=None, flowcell=None):
         """Go through FC database and collect samples have been sequenced for a project
         """
-        proj_open_date = p_con.get_entry(self.pargs.project, "open_date")
+        proj_open_date = datetime.strptime(pod,'%Y-%m-%d')
         self.proj_flowcells = {}
         sam_sequenced = defaultdict(dict)
         # collect flowcells sequenced for this project
@@ -304,7 +307,7 @@ class DeliveryController(AbstractBaseController):
                 if pid in proj_list[fc]:
                     if flowcell and flowcell != fc:
                         continue
-                    self.proj_flowcells[fc] = {'name':fc, 'type':fc_type})
+                    self.proj_flowcells[fc] = {'name':fc, 'type':fc_type}
         
         if not self.proj_flowcells:
             self.log.error("Could not find any sequenced FC for project {}".format(self.pargs.project))
