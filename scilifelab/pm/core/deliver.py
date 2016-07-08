@@ -251,9 +251,9 @@ class DeliveryController(AbstractBaseController):
                     self.app.cmd.write(jsonfile, data=jsonstr, overwrite=True)
                     self.log.debug("Saving delivery in StatusDB document {}".format(id))
                     if self.proj_flowcells[fc]['type'] == 'HiSeqX':
-                        fc_con = xcon
+                        fc_con = x_con
                     else:
-                        fc_con = fcon
+                        fc_con = f_con
                     fb_obj = fc_con.get_entry(fc)
                     fb_obj['raw_data_delivery'] = fb_obj.get('raw_data_delivery', {}).update(data)
                     self._save(fc_con,fc_obj)
