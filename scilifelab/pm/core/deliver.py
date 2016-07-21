@@ -305,7 +305,7 @@ class DeliveryController(AbstractBaseController):
                 if datetime.strptime(fc_date,'%y%m%d') < proj_open_date:
                     break
                 if pid in proj_list[fc]:
-                    if flowcell and flowcell != fc:
+                    if flowcell and flowcell != fc_name:
                         continue
                     self.proj_flowcells[fc] = {'name':fc, 'type':fc_type}
         
