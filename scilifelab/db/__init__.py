@@ -89,14 +89,15 @@ class Couch(Database):
         :param name: unique name identifier (primary key, not the uuid)
         :param field: get 'field' of document, i.e. key in document dict
         """
-        if not self._doc_type:
-            return
         self.log.debug("retrieving field entry in field '{}' for name '{}'".format(field, name))
         if self.name_view.get(name, None) is None:
             self.log.warn("no entry '{}' in {}".format(name, self.db))
             return None
-        doc = self._doc_type(**self.db.get(self.name_view.get(name)))
+        doc = self.db.get(self.name_view.get(name))
         if field:
+            if not self._doc_type:
+                return
+            doc = self._doc_type(**doc)
             return doc[field]
         else:
             return doc
