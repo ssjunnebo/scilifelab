@@ -111,14 +111,14 @@ class Couch(Database):
         """
         if not self._update_fn:
             self.db.save(obj)
-            self.log.info("Saving object {} with id {}".format(repr(obj), obj["_id"]))
+            self.log.info("Saving object with id '{}' in {}".format(obj["_id"], str(self.db)))
         else:
             (new_obj, dbid) = self._update_fn(self.db, obj, **kwargs)
             if not new_obj is None:
-                self.log.info("Saving object {} with id '{}'".format(repr(new_obj), new_obj["_id"]))
+                self.log.info("Saving object with id '{}' in {}".format(new_obj["_id"], str(self.db)))
                 self.db.save(new_obj)
             else:
-                self.log.info("Object {} with id '{}' present and not in need of updating".format(repr(obj), dbid.id))
+                self.log.info("Object with id '{}' present in {} and not in need of updating".format(dbid.id, str(self.db)))
 
 
 class GenoLogics(Database):
