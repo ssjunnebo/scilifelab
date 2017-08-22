@@ -1,43 +1,56 @@
 import couchdb
+import argparse
 import os
+import yaml
 
 from genologics_sql.queries import get_last_modified_projectids
+from genologics_sql.utils import get_session
 from genologics.entities import *
-from genologics.lims import Lims, 
+from genologics.lims import Lims
 from genologics.config import BASEURI,USERNAME,PASSWORD
 
 from LIMS2DB.utils import setupServer
-
-import argparse
 
 
 def main(args):
     lims_db = get_session()
     lims = Lims(BASEURI,USERNAME,PASSWORD)
-    couch = setupServer(args.conf)
+    with open(args.conf) as cf:
+        db_conf = yaml.load(cf)
+        couch = setupServer(db_conf)
     db = couch["expected_yields"]
-
     postgres_string="{} hours".format(args.hours)
-    project_ids=get_last_modified_projectids(db_session, postgres_string)
+    project_ids=get_last_modified_projectids(lims_db, postgres_string)
 
-    
     for project in [Project(lims, id=x) for x in project_ids]:
-        samples_nb = lims.get_samples_number(project_name=project.name)
+        samples_count = 0
+        samples = lims.get_samples(projectname=project.name)
+        for sample in samples:
+            if not("Status (manual)" in sample.udf and sample.udf["Status (manual)"] == "Aborted"):
+                samples_count +=1
         lanes_ordered = project.udf['Sequence units ordered (lanes)']
         key = parse_sequencing_platform(project.udf['Sequencing platform'])
-        for row in db.view("min_yield"):
-            if row.key==key:
-                project.udf['Reads Min']=row.value
-                project.put()
-            
+        for row in db.view("yields/min_yield"):
+            db_key = [x.lower() if x else None for x in row.key]
+            if db_key==key:
+                try:
+                    project.udf['Reads Min'] = float(row.value) * lanes_ordered / samples_count
+                    project.put()
+                except ZeroDivisionError:
+                    pass
+
 def parse_sequencing_platform(seq_plat):
-    if seq_plat in ["HiseqX", "HiSeqX", "Hiseq X", "HiSeq X"]:
-        return ["HiseqX", None, None]
+    seq_plat = seq_plat.lower()
+    if seq_plat in ["hiseqx", "hiseq x"]:
+        return ["hiseqx", None, None]
 
     elif "2500" in seq_plat:
         ar = seq_plat.split(" ")
-        return [ar[0], ar[4], "{} {}".format(ar[2], ar[3])]
-    elif "MiSeq" in seq_plat:
+        if "rapid" in ar:
+            return [ar[0].lower(), None, ar[2].lower()]
+        else:
+            return [ar[0], ar[4], "{} {}".format(ar[2].lower(), ar[3].lower())]
+    elif "miSeq" in seq_plat:
         ar = seq_plat.split(" ")
         return [ar[0], ar[1], None]
 
@@ -46,7 +59,7 @@ def parse_sequencing_platform(seq_plat):
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description=DESC)
+    parser = argparse.ArgumentParser()
     parser.add_argument('--hours',type=int, default=2,
                         help='Amount of hours to check for. Default=2')
     parser.add_argument('--conf',default=os.path.join(os.environ['HOME'],'opt/config/post_process.yaml'),
