@@ -28,8 +28,11 @@ def main(args):
         for sample in samples:
             if not("Status (manual)" in sample.udf and sample.udf["Status (manual)"] == "Aborted"):
                 samples_count +=1
-        lanes_ordered = project.udf['Sequence units ordered (lanes)']
-        key = parse_sequencing_platform(project.udf['Sequencing platform'])
+        try:
+            lanes_ordered = project.udf['Sequence units ordered (lanes)']
+            key = parse_sequencing_platform(project.udf['Sequencing platform'])
+        except:
+            continue
         for row in db.view("yields/min_yield"):
             db_key = [x.lower() if x else None for x in row.key]
             if db_key==key:
