@@ -49,7 +49,11 @@ def parse_sequencing_platform(seq_plat):
         if "rapid" in ar:
             return [ar[0].lower(), None, ar[2].lower()]
         else:
-            return [ar[0], ar[4], "{} {}".format(ar[2].lower(), ar[3].lower())]
+            try:
+                return [ar[0], ar[4], "{} {}".format(ar[2].lower(), ar[3].lower())]
+            except:
+                return[ar[0], None, "{} {}".format(ar[2].lower(), ar[3].lower())]
+
     elif "miSeq" in seq_plat:
         ar = seq_plat.split(" ")
         return [ar[0], ar[1], None]
