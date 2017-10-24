@@ -44,8 +44,8 @@ def main(args):
 
 def parse_sequencing_platform(seq_plat):
     seq_plat = seq_plat.lower()
-    if seq_plat in ["hiseqx", "hiseq x"]:
-        return ["hiseqx", None, None]
+    if seq_plat in ["hiseqx", "hiseq x", "HiSeq X", "Hiseq X"]:
+        return ["hiseq x", None, None]
 
     elif "2500" in seq_plat:
         ar = seq_plat.split(" ")
