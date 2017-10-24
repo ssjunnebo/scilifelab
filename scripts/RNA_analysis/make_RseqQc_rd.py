@@ -40,7 +40,7 @@ f=open("RSeQC_"+name+"_rd.sh",'w')
 
 print >>f, """#!/bin/bash -l
 #SBATCH -A a2012043 
-#SBATCH -p core -n 3
+#SBATCH -p core -n 6
 #SBATCH -t 50:00:00
 #SBATCH -e RSeQC_rd_{0}.err
 #SBATCH -o RSeQC_rd_{0}.out
@@ -49,6 +49,7 @@ print >>f, """#!/bin/bash -l
 #SBATCH --mail-user={1}
 {5}
 module load bioinfo-tools
+module unload gcc
 module unload samtools
 module load {3}
 module load rseqc/{6}

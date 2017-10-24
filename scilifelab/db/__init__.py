@@ -89,14 +89,15 @@ class Couch(Database):
         :param name: unique name identifier (primary key, not the uuid)
         :param field: get 'field' of document, i.e. key in document dict
         """
-        if not self._doc_type:
-            return
         self.log.debug("retrieving field entry in field '{}' for name '{}'".format(field, name))
         if self.name_view.get(name, None) is None:
             self.log.warn("no entry '{}' in {}".format(name, self.db))
             return None
-        doc = self._doc_type(**self.db.get(self.name_view.get(name)))
+        doc = self.db.get(self.name_view.get(name))
         if field:
+            if not self._doc_type:
+                return
+            doc = self._doc_type(**doc)
             return doc[field]
         else:
             return doc
@@ -110,14 +111,14 @@ class Couch(Database):
         """
         if not self._update_fn:
             self.db.save(obj)
-            self.log.info("Saving object {} with id {}".format(repr(obj), obj["_id"]))
+            self.log.info("Saving object with id '{}' in {}".format(obj["_id"], str(self.db)))
         else:
             (new_obj, dbid) = self._update_fn(self.db, obj, **kwargs)
             if not new_obj is None:
-                self.log.info("Saving object {} with id '{}'".format(repr(new_obj), new_obj["_id"]))
+                self.log.info("Saving object with id '{}' in {}".format(new_obj["_id"], str(self.db)))
                 self.db.save(new_obj)
             else:
-                self.log.info("Object {} with id '{}' present and not in need of updating".format(repr(obj), dbid.id))
+                self.log.info("Object with id '{}' present in {} and not in need of updating".format(dbid.id, str(self.db)))
 
 
 class GenoLogics(Database):

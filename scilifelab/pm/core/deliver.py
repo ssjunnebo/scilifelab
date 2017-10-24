@@ -10,6 +10,7 @@ import json
 import datetime
 
 from cement.core import controller
+from collections import defaultdict
 from scilifelab.pm.core.controller import AbstractBaseController, AbstractExtendedBaseController
 from scilifelab.report import sequencing_success
 from scilifelab.report.rl import *
@@ -18,7 +19,7 @@ from scilifelab.bcbio.run import find_samples
 from scilifelab.report.delivery_notes import sample_status_note, project_status_note, data_delivery_note
 from scilifelab.report.survey import initiate_survey, closed_projects
 from scilifelab.report.best_practice import best_practice_note, SEQCAP_KITS
-from scilifelab.db.statusdb import SampleRunMetricsConnection, ProjectSummaryConnection, FlowcellRunMetricsConnection, get_scilife_to_customer_name
+from scilifelab.db.statusdb import SampleRunMetricsConnection, ProjectSummaryConnection, FlowcellRunMetricsConnection, get_scilife_to_customer_name, X_FlowcellRunMetricsConnection
 from scilifelab.utils.misc import query_yes_no, filtered_walk, md5sum
 from scilifelab.report.gdocs_report import upload_to_gdocs
 from scilifelab.utils.timestamp import utc_time
@@ -48,6 +49,7 @@ class DeliveryController(AbstractBaseController):
             (['--no_vcf'], dict(help="Don't include vcf files in delivery", action="store_true", default=False)),
             (['--bam_file_type'], dict(help="bam file type to deliver. Default sort-dup-gatkrecal-realign", action="store", default="sort-dup-gatkrecal-realign")),
             (['-z', '--size'], dict(help="Estimate size of delivery.", action="store_true", default=False)),
+            (['-r', '--root'], dict(help="Root directrory to be used instead of pre-defined from config file", action="store", default=None, type=str)),
             (['--statusdb_project_name'], dict(help="Project name in statusdb.", action="store", default=None)),
             (['--group'], dict(help="After raw data delivery, transfer group ownership of the delivered files to this group", action="store", default=None)),
             (['--outdir'], dict(help="Deliver to this (sub)directory instead. Added for cases where the delivery directory already exists and there is no write permission.", action="store", default=None)),
@@ -66,7 +68,7 @@ class DeliveryController(AbstractBaseController):
     def _process_args(self):
         # NB: duplicate of project.ProjectController._process_args
         # setup project search space
-        self._meta.project_root = self.app.config.get("project", "root")
+        self._meta.project_root = self.pargs.root if self.pargs.root else self.app.config.get("project", "root")
         # Set root path for parent class
         self._meta.root_path = self._meta.project_root
         assert os.path.exists(self._meta.project_root), "No such directory {}; check your project config".format(self._meta.project_root)
@@ -111,11 +113,14 @@ class DeliveryController(AbstractBaseController):
 
         self.log.debug("Connecting to project database")
         p_con = ProjectSummaryConnection(**vars(self.pargs))
-        assert p_con, "Could not get connection to project databse"
-        self.log.debug("Connecting to samples database")
-        s_con = SampleRunMetricsConnection(**vars(self.pargs))
-        assert s_con, "Could not get connection to samples databse"
-
+        assert p_con, "Could not get connection to project database"
+        self.log.debug("Connecting to flowcell database")
+        f_con = FlowcellRunMetricsConnection(**vars(self.pargs))
+        assert f_con, "Could not get connection to flowcell database"
+        self.log.debug("Connecting to x_flowcell database")
+        x_con = X_FlowcellRunMetricsConnection(**vars(self.pargs))
+        assert x_con, "Could not get connection to x_flowcell database"
+        
         # Fetch the Uppnex project to deliver to
         if not self.pargs.uppmax_project:
             self.pargs.uppmax_project = p_con.get_entry(self.pargs.project, "uppnex_id")
@@ -123,11 +128,8 @@ class DeliveryController(AbstractBaseController):
                 self.log.error("Uppmax project was not specified and could not be fetched from project database")
                 return
 
-        # Extract the list of samples and runs associated with the project and sort them
-        samples = sorted(s_con.get_samples(fc_id=self.pargs.flowcell, sample_prj=self.pargs.project), key=lambda k: (k.get('project_sample_name','NA'), k.get('flowcell','NA'), k.get('lane','NA')))
-
         # Setup paths and verify parameters
-        self._meta.production_root = self.app.config.get("production", "root")
+        self._meta.production_root = self.pargs.root if self.pargs.root else self.app.config.get("production", "root")
         self._meta.root_path = self._meta.production_root
         proj_base_dir = os.path.join(self._meta.root_path, self.pargs.project)
         assert os.path.exists(self._meta.production_root), "No such directory {}; check your production config".format(self._meta.production_root)
@@ -148,41 +150,40 @@ class DeliveryController(AbstractBaseController):
         destination_root = os.path.join(self._meta.uppnex_project_root,self.pargs.uppmax_project,self._meta.uppnex_delivery_dir)
         assert os.path.exists(destination_root), "Delivery destination folder {} does not exist".format(destination_root)
         destination_root = os.path.join(destination_root,self.pargs.project)
+        
+        # Find uncompressed fastq
+        uncompressed = self._find_uncompressed_fastq_files(proj_base_dir=proj_base_dir, sample=self.pargs.sample, flowcell=self.pargs.flowcell)
+        if len(uncompressed) > 0:
+            self.log.error("There are uncompressed fastq file for project, kindly check all files are compressed properly before delivery")
+            return
+        
+        # Extract the list of samples and runs associated with the project and sort them
+        samples = self.samples_to_copy(pid = p_con.get_entry(self.pargs.project, "project_id"),
+                                       pod = p_con.get_entry(self.pargs.project, "open_date"),
+                                       fc_dict = {'HiSeq2500':f_con.proj_list, 'HiSeqX':x_con.proj_list},
+                                       proj_base_dir = proj_base_dir,
+                                       destination_root = destination_root,
+                                       sample = self.pargs.sample,
+                                       flowcell = self.pargs.flowcell)
 
         # If interactively select, build a list of samples to skip
         if self.pargs.interactive:
-            to_process = []
+            to_process = {}
             for sample in samples:
-                sname = sample.get("project_sample_name")
-                index = sample.get("sequence")
-                fcid = sample.get("flowcell")
-                lane = sample.get("lane")
-                date = sample.get("date")
-                self.log.info("Sample: {}, Barcode: {}, Flowcell: {}, Lane: {}, Started on: {}".format(sname,
-                                                                                                           index,
-                                                                                                           fcid,
-                                                                                                           lane,
-                                                                                                           date))
-                if query_yes_no("Deliver sample?", default="no"):
-                    to_process.append(sample)
+                if query_yes_no("Deliver sample {} ?".format(sample), default="no"):
+                    to_process[sample] = samples[sample]
             samples = to_process
 
-        # Find uncompressed fastq
-        uncompressed = self._find_uncompressed_fastq_files(proj_base_dir,samples)
-        if len(uncompressed) > 0:
-            self.log.warn("The following samples have uncompressed *.fastq files that cannot be delivered: {}".format(",".join(uncompressed)))
-            if not query_yes_no("Continue anyway?", default="no"):
+        if self.pargs.sample:
+            sample = samples.get(self.pargs.sample)
+            if not sample:
+                self.log.error("There is no such sample {} for project {}".format(self.pargs.sample, self.pargs.project))
                 return
+            samples = {self.pargs.sample: sample}
 
         self.log.info("Will deliver data for {} samples from project {} to {}".format(len(samples),self.pargs.project,destination_root))
         if not query_yes_no("Continue?"):
             return
-
-        # Get the list of files to transfer and the destination
-        self.log.debug("Gathering list of files to copy")
-        to_copy = self.get_file_copy_list(proj_base_dir,
-                                          destination_root,
-                                          samples)
 
         # Make sure that transfer will be with rsync
         if not self.pargs.rsync:
@@ -191,74 +192,75 @@ class DeliveryController(AbstractBaseController):
                 return
             self.pargs.rsync = True
 
-        # Process each sample run
-        for id, files in to_copy.items():
-            # get the sample database object
-            [sample] = [s for s in samples if s.get('_id') == id]
-            self.log.info("Processing sample {} and flowcell {}".format(sample.get("project_sample_name","NA"),sample.get("flowcell","NA")))
+        # Process each sample
+        for sample, flowcells in samples.iteritems():
+            for fc, files in flowcells.iteritems():
+                self.log.info("Processing sample {} and flowcell {}".format(sample, fc))
 
-            # transfer files
-            self.log.debug("Transferring {} fastq files".format(len(files)))
-            self._transfer_files([f[0] for f in files], [f[1] for f in files])
+                # transfer files
+                self.log.debug("Transferring {} fastq files".format(len(files['src'])))
+                self._transfer_files(sources=files['src'], targets=files['dst'])
 
-            passed = True
-            if self.pargs.link or self.pargs.dry_run:
-                passed = False
-            else:
-                # calculate md5sums on the source side and write it on the destination
-                md5 = []
-                for f in files:
-                    m = md5sum(f[0])
-                    mfile = "{}.md5".format(f[1])
-                    md5.append([m,mfile,f[2],f[0]])
-                    self.log.debug("md5sum for source file {}: {}".format(f[0],m))
+                passed = True
+                if self.pargs.link or self.pargs.dry_run:
+                    passed = False
+                else:
+                    # calculate md5sums on the source side and write it on the destination
+                    md5 = []
+                    for s,d in zip(files['src'], files['dst']):
+                        m = md5sum(s)
+                        mfile = "{}.md5".format(d)
+                        md5.append([m,mfile,s])
+                        self.log.debug("md5sum for source file {}: {}".format(s,m))
 
-                # write the md5sum to a file at the destination and verify the transfer
-                for m, mfile, read, srcpath in md5:
-                    dstfile = os.path.splitext(mfile)[0]
-                    self.log.debug("Writing md5sum to file {}".format(mfile))
-                    self.app.cmd.write(mfile,"{}  {}".format(m,os.path.basename(dstfile)),True)
-                    self.log.debug("Verifying md5sum for file {}".format(dstfile))
-                    dm = md5sum(dstfile)
-                    self.log.debug("md5sum for destination file {}: {}".format(dstfile,dm))
-                    if m != dm:
-                        self.log.warn("md5sum verification FAILED for {}. Source: {}, Target: {}".format(dstfile,m,dm))
-                        self.log.warn("Improperly transferred file {} is removed from destination, please retry transfer of this file".format(dstfile))
-                        self.app.cmd.safe_unlink(dstfile)
-                        self.app.cmd.safe_unlink(mfile)
-                        passed = False
-                        continue
+                    # write the md5sum to a file at the destination and verify the transfer
+                    for m, mfile, srcpath in md5:
+                        dstfile = os.path.splitext(mfile)[0]
+                        self.log.debug("Writing md5sum to file {}".format(mfile))
+                        self.app.cmd.write(mfile,"{}  {}".format(m,os.path.basename(dstfile)),True)
+                        self.log.debug("Verifying md5sum for file {}".format(dstfile))
+                        dm = md5sum(dstfile)
+                        self.log.debug("md5sum for destination file {}: {}".format(dstfile,dm))
+                        if m != dm:
+                            self.log.warn("md5sum verification FAILED for {}. Source: {}, Target: {}".format(dstfile,m,dm))
+                            self.log.warn("Improperly transferred file {} is removed from destination, please retry transfer of this file".format(dstfile))
+                            self.app.cmd.safe_unlink(dstfile)
+                            self.app.cmd.safe_unlink(mfile)
+                            passed = False
+                            continue
 
-                    # Modify the permissions to ug+rw
-                    for f in [dstfile, mfile]:
-                        self.app.cmd.chmod(f,stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
+                        # Modify the permissions to ug+rw
+                        for f in [dstfile, mfile]:
+                            self.app.cmd.chmod(f,stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
 
-            # touch the flag to trigger uppmax inbox permission fix
-            self.app.cmd.safe_touchfile(os.path.join("/sw","uppmax","var","inboxfix","schedule",self.pargs.uppmax_project))
+                # touch the flag to trigger uppmax inbox permission fix
+                self.app.cmd.safe_touchfile(os.path.join("/sw","uppmax","var","inboxfix","schedule",self.pargs.uppmax_project))
 
-            # log the transfer to statusdb if verification passed
-            if passed:
-                self.log.info("Logging delivery to StatusDB document {}".format(id))
-                data = {'raw_data_delivery': {'timestamp': utc_time(),
-                                              'files': {'R{}'.format(read):{'md5': m,
-                                                                            'path': os.path.splitext(mfile)[0],
-                                                                            'size_in_bytes': self._getsize(os.path.splitext(mfile)[0]),
-                                                                            'source_location': srcpath} for m, mfile, read, srcpath in md5},
-                                              }
-                        }
-                jsonstr = json.dumps(data)
-                jsonfile = os.path.join(os.path.dirname(md5[0][3]),
-                                        "{}_{}_{}_{}_L{}_raw_data_delivery.json".format(sample.get("date"),
-                                                                                       sample.get("flowcell"),
-                                                                                       sample.get("project_sample_name"),
-                                                                                       sample.get("sequence"),
-                                                                                       sample.get("lane")))
-                self.log.debug("Writing delivery to json file {}".format(jsonfile))
-                self.app.cmd.write(jsonfile,data=jsonstr,overwrite=True)
-                self.log.debug("Saving delivery in StatusDB document {}".format(id))
-                sample.update(data)
-                self._save(s_con,sample)
-                self.log.debug(jsonstr)
+                # log the transfer to statusdb if verification passed
+                if passed:
+                    data = {'raw_data_delivery': {'timestamp': utc_time(),
+                                                  'files': {os.path.splitext((os.path.basename(srcpath)))[0]:{'md5': m,
+                                                                                'path': os.path.splitext(mfile)[0],
+                                                                                'size_in_bytes': self._getsize(os.path.splitext(mfile)[0]),
+                                                                                'source_location': srcpath} for m, mfile, srcpath in md5}
+                                                  }
+                            }
+                    jsonstr = json.dumps(data)
+                    jsonfile = os.path.join(proj_base_dir, sample, fc, "{}_{}_raw_data_delivery.json".format(sample, fc))
+                    self.log.debug("Writing delivery to json file {}".format(jsonfile))
+                    self.app.cmd.write(jsonfile, data=jsonstr, overwrite=True)
+                    self.log.debug("Saving delivery in StatusDB document {}".format(id))
+                    if self.proj_flowcells[fc]['type'] == 'HiSeqX':
+                        fc_con = x_con
+                    else:
+                        fc_con = f_con
+                    fc_obj = fc_con.get_entry(fc)
+                    self.log.info("Logging delivery to StatusDB document {}".format(fc_obj.get('_id')))
+                    fc_raw_data = fc_obj.get('raw_data_delivery', {})
+                    fc_raw_data.update(data['raw_data_delivery'])
+                    fc_obj['raw_data_delivery'] = fc_raw_data
+                    self._save(fc_con,fc_obj)
+                    self.log.debug(jsonstr)
 
     def _getsize(self, file):
         """Wrapper around getsize
@@ -277,69 +279,57 @@ class DeliveryController(AbstractBaseController):
             con.save(obj)
         return self.app.cmd.dry("storing object {} in {}".format(obj.get('_id'),con.db), runpipe)
 
-    def _find_uncompressed_fastq_files(self, proj_base_dir, samples):
+    def _find_uncompressed_fastq_files(self, proj_base_dir, sample=None, flowcell=None):
         """Finds samples with uncompressed fastq files in project/fc_id/sample_id directories
-        Returns a list of sample names
+        Returns a list of uncompressed files
         """
+                
+        path = proj_base_dir
+        path = os.path.join(path, sample if sample else '*')
+        path = os.path.join(path, flowcell if flowcell else '*')
+        path = os.path.join(path, '*.fastq')
+        files = glob.glob(path)
+        return files
 
-        uncompressed = []
-        for sample in samples:
-            date = sample.get("date",False)
-            fcid = sample.get("flowcell",False)
-            dname = sample.get("barcode_name","")
-            runname = "{}_{}".format(date,fcid)
-
-            path = os.path.join(proj_base_dir,dname,runname,"*.fastq")
-            files = glob.glob(path)
-            if len(files) > 0:
-                uncompressed.append(dname)
-
-        return set(uncompressed)
-
-
-    def get_file_copy_list(self, proj_base_dir, dest_proj_path, samples):
-        """Traverse the project folder and collect the files that should be delivered. Returns
-        a list of 2-element lists with elements source_path and destination_path
+    def samples_to_copy(self, pid, pod, fc_dict, proj_base_dir, destination_root, sample=None, flowcell=None):
+        """Go through FC database and collect samples have been sequenced for a project
         """
-
-        to_copy = {}
-        for sample in samples:
-            sfiles = []
-            sname = sample.get("project_sample_name",None)
-
-            dname = sample.get("barcode_name",None)
-            if not dname:
-                self.log.warn("Could not fetch sample directory (barcode name) for {} from database document {}. Skipping sample".format(sname,sample.get('_id')))
+        proj_open_date = datetime.strptime(pod,'%Y-%m-%d')
+        self.proj_flowcells = {}
+        sam_sequenced = defaultdict(dict)
+        # collect flowcells sequenced for this project
+        for fc_type, proj_list in fc_dict.iteritems():
+            sort_fcs = sorted(proj_list.keys(), key=lambda k: datetime.strptime(k.split('_')[0], "%y%m%d"), reverse=True)
+            for fc in sort_fcs:
+                fc_date, fc_name = fc.split('_')
+                if datetime.strptime(fc_date,'%y%m%d') < proj_open_date:
+                    break
+                if pid in proj_list[fc]:
+                    if flowcell and flowcell != fc_name:
+                        continue
+                    self.proj_flowcells[fc] = {'name':fc, 'type':fc_type}
+        
+        if not self.proj_flowcells:
+            self.log.error("Could not find any sequenced FC for project {}".format(self.pargs.project))
+            return
+        
+        # go through collected FCs and create source and target list for rsync
+        for fc in self.proj_flowcells.values():
+            fc_run = fc['name']
+            fc_fq_files = glob.glob(os.path.join(proj_base_dir, "{}*".format(pid), fc_run, "*.fastq.gz"))
+            if not fc_fq_files:
+                self.log.error("FC {} was sequenced for project {}, but could not find any fastq files in {}".format(fc_run, self.pargs.project, proj_base_dir))
                 continue
-
-            date = sample.get("date","NA")
-            fcid = sample.get("flowcell","NA")
-            lane = sample.get("lane","")
-            runname = "{}_{}".format(date,fcid)
-            seqdir = os.path.join(proj_base_dir,dname,runname)
-            dstdir = os.path.join(dest_proj_path, dname, runname)
-            if not os.path.exists(seqdir):
-                self.log.warn("Sample and flowcell directory {} does not exist. Skipping sample".format(seqdir))
-                continue
-
-            for read in xrange(1,10):
-                # Locate the source file, allow a wildcard to accommodate sample names with index
-                fname = "{}*_{}_L00{}_R{}_001.fastq.gz".format(sname,sample.get("sequence",""),sample.get("lane",""),str(read))
-                file = glob.glob(os.path.join(seqdir,fname))
-                if len(file) != 1:
-                    if read == 1:
-                        self.log.warn("Did not find expected fastq file {} in folder {}".format(fname,seqdir))
-                    continue
-                file = file[0]
-
-                # Construct the destination file name according to the convention
-                dstfile = "{}_{}_{}_{}_{}.fastq.gz".format(lane,date,fcid,sname,str(read))
-                if sample.get('_id') not in to_copy:
-                    to_copy[sample.get('_id')] = []
-                to_copy[sample.get('_id')].append([file,os.path.join(dest_proj_path,sname,runname,dstfile),read])
-
-        return to_copy
-
+            for src_fq in fc_fq_files:
+                samp = os.path.basename(os.path.dirname(os.path.dirname(src_fq)))
+                dst_fq = src_fq.replace(proj_base_dir, destination_root)
+                if fc_run not in sam_sequenced[samp]:
+                    sam_sequenced[samp][fc_run] = defaultdict(list)
+                sam_sequenced[samp][fc_run]['src'].append(src_fq)
+                sam_sequenced[samp][fc_run]['dst'].append(dst_fq)
+        
+        return sam_sequenced
+    
     @controller.expose(help="Deliver best practice results")
     def best_practice(self):
         if not self._check_pargs(["project", "uppmax_project"]):
