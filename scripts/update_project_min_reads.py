@@ -28,8 +28,11 @@ def main(args):
         for sample in samples:
             if not("Status (manual)" in sample.udf and sample.udf["Status (manual)"] == "Aborted"):
                 samples_count +=1
-        lanes_ordered = project.udf['Sequence units ordered (lanes)']
-        key = parse_sequencing_platform(project.udf['Sequencing platform'])
+        try:
+            lanes_ordered = project.udf['Sequence units ordered (lanes)']
+            key = parse_sequencing_platform(project.udf['Sequencing platform'])
+        except:
+            continue
         for row in db.view("yields/min_yield"):
             db_key = [x.lower() if x else None for x in row.key]
             if db_key==key:
@@ -41,15 +44,19 @@ def main(args):
 
 def parse_sequencing_platform(seq_plat):
     seq_plat = seq_plat.lower()
-    if seq_plat in ["hiseqx", "hiseq x"]:
-        return ["hiseqx", None, None]
+    if seq_plat in ["hiseqx", "hiseq x", "HiSeq X", "Hiseq X"]:
+        return ["hiseq x", None, None]
 
     elif "2500" in seq_plat:
         ar = seq_plat.split(" ")
         if "rapid" in ar:
             return [ar[0].lower(), None, ar[2].lower()]
         else:
-            return [ar[0], ar[4], "{} {}".format(ar[2].lower(), ar[3].lower())]
+            try:
+                return [ar[0], ar[4], "{} {}".format(ar[2].lower(), ar[3].lower())]
+            except:
+                return[ar[0], None, "{} {}".format(ar[2].lower(), ar[3].lower())]
+
     elif "miSeq" in seq_plat:
         ar = seq_plat.split(" ")
         return [ar[0], ar[1], None]

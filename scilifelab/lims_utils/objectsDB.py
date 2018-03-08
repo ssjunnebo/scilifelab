@@ -330,7 +330,7 @@ class SampleDB():
     def _make_sample_run_id(self, seq_art, lims_run, prep, run_type):
         samp_run_met_id = None
         barcode = self._get_barcode(prep['reagent_label'])
-        if run_type == "MiSeq Run (MiSeq) 4.0":
+        if run_type in ["46", "MiSeq Run (MiSeq) 4.0"] :
             lane = seq_art.location[1].split(':')[1]
         else:
             lane = seq_art.location[1].split(':')[0]
