@@ -15,20 +15,33 @@ pjs=lims.get_projects(open_date=sixMonthsAgo.strftime("%Y-%m-%d"))
 
 operator="par.lundin@scilifelab.se"
 summary={}
-email={u'Anna Konrad':'anna.konrad@scilifelab.se',
-        u'Bahram Amini':'bahram.amini@scilifelab.se',
-        u'Chuan Wang':'chuan.wang@scilifelab.se',
-        u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
-        u'Helena Zajac':'helena.zajac@scilifelab.se',
-        u'Joel Gruselius':'joel.gruselius@scilifelab.se',
-        u'Jun Wang':'jun.wang@scilifelab.se',
-        u'Lina Sylwan':'lina.sylwan@scilifelab.se',
-        u'Nemanja Rilakovic':'nemanja.rilakovic@scilifelab.se',
-        u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se',
-        u'Par Lundin':'par.lundin@scilifelab.se',
-        u'Phil Ewels':'phil.ewels@scilifelab.se',
-        u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se'
-        }
+email={
+    u'Anandashankar Anil': 'aanil@scilifelab.se',
+    u'Anna Konrad':'anna.konrad@scilifelab.se',
+    u'Bahram Amini':'bahram.amini@scilifelab.se',
+    u'Christian Natanaelsson':'christian.natanaelsson@scilifelab.se',
+    u'Chuan Wang':'chuan.wang@scilifelab.se',
+    u'Elisabet Einarsdottir':'elisabet.einarsdottir@scilifelab.se',
+    u'Fanny Taborsak':'fanny.taborsak@scilifelab.se',
+    u'Franziska Bonath':'franziska.bonath@scilifelab.se',
+    u'Helena Zajac':'helena.zajac@scilifelab.se',
+    u'Joel Gruselius':'joel.gruselius@scilifelab.se',
+    u'Johannes Alneberg':'johannes.alneberg@scilifelab.se',
+    u'Jun Wang':'jun.wang@scilifelab.se',
+    u'Lina Sylwan':'lina.sylwan@scilifelab.se',
+    u'Liqun Yao':'liqun.yao@scilifelab.se',
+    u'Magdalena Lindberg':'magdalena.lindberg@scilifelab.se',
+    u'Mattias Oskarsson':'mattias.oskarsson@scilifelab.se',
+    u'Nemanja Rilakovic':'nemanja.rilakovic@scilifelab.se',
+    u'Orlando Contreras':'orlando.contreras@scilifelab.se',
+    u'Par Lundin':'par.lundin@scilifelab.se',
+    u'Phil Ewels':'phil.ewels@scilifelab.se',
+    u'Pontus Hojer':'pontus.hojer@scilifelab.se',
+    u'Remi-Andre Olsen':'remi-andre.olsen@scilifelab.se',
+    u'Salvatore Nania':'salvatore.nania@scilifelab.se',
+    u'Sofia Haglund':'sofia.haglund@scilifelab.se',
+    u'Veronica Sobrado':'veronica.sobrado@scilifelab.se'
+}
 project_types=['Bcl Conversion & Demultiplexing (Illumina SBS) 4.0','Illumina Sequencing (Illumina SBS) 4.0', 
 'MiSeq Run (MiSeq) 4.0','Cluster Generation (Illumina SBS) 4.0','Denature, Dilute and Load Sample (MiSeq) 4.0', 'Aggregate QC (DNA) 4.0','Aggregate QC (RNA) 4.0', 'Project Summary 1.3']
 
